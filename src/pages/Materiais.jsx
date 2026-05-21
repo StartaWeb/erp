@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { getMateriais, addMaterial, updateMaterial } from '../services/db';
-import { Plus, Search, Package, Edit, Trash2, Camera } from 'lucide-react';
+import { Plus, Search, Package, Edit, Camera } from 'lucide-react';
 
 export default function Materiais() {
   const [materiais, setMateriais] = useState([]);

@@ -12,28 +12,31 @@ export default function Relatorios() {
   const [materiais, setMateriais] = useState({});
   const [loading, setLoading] = useState(true);
 
-  async function loadData() {
-    try {
-      setLoading(true);
-      const [histData, matsData] = await Promise.all([
-        getHistoricoMovimentacoes(),
-        getMateriais()
-      ]);
-      
-      const matsMap = {};
-      matsData.forEach(m => { matsMap[m.id] = m; });
-      
-      setMateriais(matsMap);
-      setHistorico(histData);
-    } catch (error) {
-      console.error("Erro ao carregar relatórios", error);
-    } finally {
-      setLoading(false);
-    }
-  }
-
   useEffect(() => {
+    let isMounted = true;
+    async function loadData() {
+      try {
+        setLoading(true);
+        const [histData, matsData] = await Promise.all([
+          getHistoricoMovimentacoes(),
+          getMateriais()
+        ]);
+        
+        if (isMounted) {
+          const matsMap = {};
+          matsData.forEach(m => { matsMap[m.id] = m; });
+          
+          setMateriais(matsMap);
+          setHistorico(histData);
+        }
+      } catch (error) {
+        console.error("Erro ao carregar relatórios", error);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    }
     loadData();
+    return () => { isMounted = false; };
   }, []);
 
   function exportPDF() {
