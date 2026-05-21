@@ -3,7 +3,7 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { 
   Package, LayoutDashboard, ArrowLeftRight, 
-  Settings, LogOut, Menu, X, Users, Wrench, FileText
+  LogOut, Menu, X, Users, Wrench, FileText
 } from 'lucide-react';
 
 export default function MainLayout() {

@@ -1,7 +1,7 @@
 import { db } from '../firebase';
 import { 
-  collection, doc, getDocs, getDoc, addDoc, updateDoc, deleteDoc, 
-  query, where, orderBy, Timestamp, runTransaction
+  collection, doc, getDocs, getDoc, addDoc, updateDoc, 
+  query, orderBy, Timestamp, runTransaction
 } from 'firebase/firestore';
 
 function parseNum(val) {

@@ -178,8 +178,8 @@ export default function Materiais() {
 
       {/* Modal de Novo Material */}
       {showModal && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '2rem 1rem', overflowY: 'auto' }}>
-          <div className="card animate-fade-in" style={{ width: '100%', maxWidth: '600px', margin: 'auto' }}>
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '1rem', overflowY: 'auto' }}>
+          <div className="card animate-fade-in" style={{ width: '100%', maxWidth: '600px', margin: '2rem auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
               <h2 style={{ fontSize: '1.25rem' }}>{editingId ? 'Editar Material' : 'Adicionar Novo Material'}</h2>
               <button onClick={closeModal} style={{ background: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>X</button>
