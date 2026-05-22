@@ -250,7 +250,9 @@ export async function getHistoricoMovimentacoes() {
   
   // Combina e ordena por data descrescente
   const historico = [...entradas, ...saidas, ...devolucoes].sort((a, b) => {
-    return b.dataRegistro.toMillis() - a.dataRegistro.toMillis();
+    const timeA = a.dataRegistro ? (typeof a.dataRegistro.toMillis === 'function' ? a.dataRegistro.toMillis() : 0) : 0;
+    const timeB = b.dataRegistro ? (typeof b.dataRegistro.toMillis === 'function' ? b.dataRegistro.toMillis() : 0) : 0;
+    return timeB - timeA;
   });
   
   return historico;

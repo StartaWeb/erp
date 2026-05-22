@@ -163,7 +163,7 @@ export default function Movimentacoes() {
 
     recentes.forEach(h => {
       const mat = materiais.find(m => m.id === h.materialId);
-      const dataStr = h.dataRegistro ? format(h.dataRegistro.toDate(), 'dd/MM/yyyy HH:mm') : '-';
+      const dataStr = (h.dataRegistro && typeof h.dataRegistro.toDate === 'function') ? format(h.dataRegistro.toDate(), 'dd/MM/yyyy HH:mm') : '-';
       const tipoStr = h.tipo;
       const matStr = mat ? ((mat.codigo_descricao ? mat.codigo_descricao+' - ' : '') + mat.descricao) : 'Desconhecido';
       
@@ -186,7 +186,7 @@ export default function Movimentacoes() {
       const frente = frentes.find(f => f.id === h.frenteTrabalhoId);
 
       return {
-        'Data Hora': h.dataRegistro ? format(h.dataRegistro.toDate(), 'dd/MM/yyyy HH:mm') : '-',
+        'Data Hora': (h.dataRegistro && typeof h.dataRegistro.toDate === 'function') ? format(h.dataRegistro.toDate(), 'dd/MM/yyyy HH:mm') : '-',
         'Tipo Movimento': h.tipo,
         'Cód. Material': mat?.codigo_descricao || '',
         'Descrição Material': mat?.descricao || 'Desconhecido',
@@ -433,7 +433,7 @@ export default function Movimentacoes() {
                   const mat = materiais.find(m => m.id === h.materialId);
                   return (
                     <tr key={h.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                      <td style={{ padding: '0.75rem' }}>{h.dataRegistro ? format(h.dataRegistro.toDate(), "dd/MM HH:mm") : '-'}</td>
+                      <td style={{ padding: '0.75rem' }}>{(h.dataRegistro && typeof h.dataRegistro.toDate === 'function') ? format(h.dataRegistro.toDate(), "dd/MM HH:mm") : '-'}</td>
                       <td style={{ padding: '0.75rem' }}>
                         <span style={{ 
                           padding: '0.15rem 0.35rem', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 'bold',

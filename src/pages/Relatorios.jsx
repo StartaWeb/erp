@@ -74,7 +74,7 @@ export default function Relatorios() {
 
     dadosFiltrados.forEach(h => {
       const mat = materiais[h.materialId];
-      const dataStr = h.dataRegistro ? format(h.dataRegistro.toDate(), 'dd/MM/yyyy HH:mm') : '-';
+      const dataStr = (h.dataRegistro && typeof h.dataRegistro.toDate === 'function') ? format(h.dataRegistro.toDate(), 'dd/MM/yyyy HH:mm') : '-';
       const tipoStr = h.tipo;
       const matStr = mat ? ((mat.codigo_descricao ? mat.codigo_descricao+' - ' : '') + mat.descricao) : 'Desconhecido';
       
@@ -98,7 +98,7 @@ export default function Relatorios() {
       const frente = frentes[h.frenteTrabalhoId];
 
       return {
-        'Data Hora': h.dataRegistro ? format(h.dataRegistro.toDate(), 'dd/MM/yyyy HH:mm') : '-',
+        'Data Hora': (h.dataRegistro && typeof h.dataRegistro.toDate === 'function') ? format(h.dataRegistro.toDate(), 'dd/MM/yyyy HH:mm') : '-',
         'Tipo Movimento': h.tipo,
         'Cód. Material': mat?.codigo_descricao || '',
         'Descrição Material': mat?.descricao || 'Desconhecido',
@@ -315,7 +315,7 @@ export default function Relatorios() {
                     return (
                       <tr key={h.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
                         <td style={{ padding: '1rem' }}>
-                          {h.dataRegistro ? format(h.dataRegistro.toDate(), "dd/MMM yy HH:mm", { locale: ptBR }) : '-'}
+                          {(h.dataRegistro && typeof h.dataRegistro.toDate === 'function') ? format(h.dataRegistro.toDate(), "dd/MMM yy HH:mm", { locale: ptBR }) : '-'}
                         </td>
                         <td style={{ padding: '1rem' }}>
                           <span style={{ 

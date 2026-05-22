@@ -44,7 +44,7 @@ export default function Dashboard() {
         let saidasMes = 0;
         
         hist.forEach(mov => {
-          const dataMov = mov.dataRegistro?.toDate();
+          const dataMov = (mov.dataRegistro && typeof mov.dataRegistro.toDate === 'function') ? mov.dataRegistro.toDate() : null;
           if (dataMov && dataMov.getMonth() === mesAtual && dataMov.getFullYear() === anoAtual) {
             if (mov.tipo === 'ENTRADA') entradasMes++;
             if (mov.tipo === 'SAIDA') saidasMes++;
@@ -151,7 +151,7 @@ export default function Dashboard() {
               <tbody>
                 {recentes.map(mov => (
                   <tr key={mov.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                    <td style={{ padding: '0.75rem' }}>{mov.dataRegistro?.toDate().toLocaleString('pt-BR', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'})}</td>
+                    <td style={{ padding: '0.75rem' }}>{mov.dataRegistro && typeof mov.dataRegistro.toDate === 'function' ? mov.dataRegistro.toDate().toLocaleString('pt-BR', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'}) : '-'}</td>
                     <td style={{ padding: '0.75rem' }}>
                       <span style={{ 
                         padding: '0.25rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 'bold',
