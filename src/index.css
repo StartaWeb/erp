@@ -176,6 +176,10 @@ button {
 .excel-table th, .excel-table td {
   border: 1px solid var(--border-color);
   padding: 0.5rem 0.75rem;
+  word-break: break-word;
+}
+
+.excel-table th {
   white-space: nowrap;
 }
 

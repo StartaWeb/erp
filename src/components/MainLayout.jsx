@@ -160,7 +160,7 @@ export default function MainLayout() {
           </h2>
         </header>
 
-        <div style={{ padding: '1.5rem', flex: 1, overflowX: 'auto' }}>
+        <div style={{ padding: '1.5rem', flex: 1 }}>
           <Outlet />
         </div>
       </main>

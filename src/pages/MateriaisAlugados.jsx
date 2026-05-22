@@ -203,6 +203,7 @@ export default function MateriaisAlugados() {
                 <th style={{ padding: '1rem', fontWeight: '500', color: 'var(--text-muted)' }}>Entrada</th>
                 <th style={{ padding: '1rem', fontWeight: '500', color: 'var(--text-muted)' }}>Saída Prev.</th>
                 <th style={{ padding: '1rem', fontWeight: '500', color: 'var(--text-muted)' }}>Status</th>
+                <th style={{ padding: '1rem', fontWeight: '500', color: 'var(--text-muted)' }}>Observação</th>
                 <th style={{ padding: '1rem', fontWeight: '500', color: 'var(--text-muted)' }}>Ações</th>
               </tr>
             </thead>
@@ -225,6 +226,9 @@ export default function MateriaisAlugados() {
                     }}>
                       {m.status}
                     </span>
+                  </td>
+                  <td style={{ padding: '1rem', color: 'var(--text-muted)', fontSize: '0.85rem', maxWidth: '200px', whiteSpace: 'normal' }}>
+                    {m.observacoes || '-'}
                   </td>
                   <td style={{ padding: '1rem', display: 'flex', gap: '0.5rem' }}>
                     <button onClick={() => handleEdit(m)} style={{ background: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><Edit size={18} /></button>
