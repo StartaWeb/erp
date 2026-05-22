@@ -45,6 +45,11 @@ export async function updateMaterial(id, data) {
   return updateDoc(docRef, cleanData);
 }
 
+export async function deleteMaterial(id) {
+  const docRef = doc(db, 'materiais', id);
+  return deleteDoc(docRef);
+}
+
 // --- FRENTES DE TRABALHO ---
 export const frentesRef = collection(db, 'frentes_trabalho');
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { getMateriais, addMaterial, updateMaterial, getFornecedores } from '../services/db';
-import { Plus, Search, Package, Edit, Camera, Download } from 'lucide-react';
+import { getMateriais, addMaterial, updateMaterial, getFornecedores, deleteMaterial } from '../services/db';
+import { Plus, Search, Package, Edit, Camera, Download, Trash2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 export default function Materiais() {
@@ -79,6 +79,19 @@ export default function Materiais() {
   function handleNew() {
     closeModal();
     setShowModal(true);
+  }
+
+  async function handleDelete(id) {
+    if (window.confirm('Tem certeza que deseja excluir este material? Esta ação não pode ser desfeita.')) {
+      try {
+        await deleteMaterial(id);
+        alert('Material excluído com sucesso!');
+        loadData();
+      } catch (error) {
+        console.error('Erro ao excluir:', error);
+        alert('Erro ao excluir material.');
+      }
+    }
   }
 
   function handleEdit(m) {
@@ -229,8 +242,9 @@ export default function Materiais() {
                       </td>
                       <td style={{ textAlign: 'right' }}>R$ {Number(m.preco_unitario_medio || 0).toFixed(2)}</td>
                       <td style={{ textAlign: 'right', fontWeight: '500' }}>R$ {valorTotal.toFixed(2)}</td>
-                      <td style={{ textAlign: 'center' }}>
+                      <td style={{ textAlign: 'center', display: 'flex', justifyContent: 'center', gap: '0.5rem' }}>
                         <button onClick={() => handleEdit(m)} style={{ background: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><Edit size={16} /></button>
+                        <button onClick={() => handleDelete(m.id)} style={{ background: 'none', color: 'var(--danger)', cursor: 'pointer' }}><Trash2 size={16} /></button>
                       </td>
                     </tr>
                   )
