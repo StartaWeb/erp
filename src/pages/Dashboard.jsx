@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { getMateriais, getHistoricoMovimentacoes, getMateriaisAlugados } from '../services/db';
-import { Package, TrendingUp, TrendingDown, AlertTriangle, DollarSign, CalendarClock } from 'lucide-react';
+import { Package, TrendingUp, TrendingDown, AlertTriangle, DollarSign, CalendarClock, CheckCircle2 } from 'lucide-react';
 import { format, isBefore, addDays, isAfter } from 'date-fns';
 
 function safeFormatDate(dateVal, formatStr) {
