@@ -1,7 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { getMateriais, getFrentes, getFornecedores, registrarEntrada, registrarSaida, registrarDevolucao } from '../services/db';
-import { ArrowDownLeft, ArrowUpRight, RotateCcw, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { getMateriais, getFrentes, getFornecedores, getHistoricoMovimentacoes, registrarEntrada, registrarSaida, registrarDevolucao } from '../services/db';
+import { ArrowDownLeft, ArrowUpRight, RotateCcw, AlertCircle, CheckCircle2, FileText, Download, FileSpreadsheet } from 'lucide-react';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 
 export default function Movimentacoes() {
   const { userProfile, currentUser } = useAuth();
@@ -9,6 +14,7 @@ export default function Movimentacoes() {
   const [materiais, setMateriais] = useState([]);
   const [frentes, setFrentes] = useState([]);
   const [fornecedores, setFornecedores] = useState([]);
+  const [historico, setHistorico] = useState([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
 
@@ -43,10 +49,16 @@ export default function Movimentacoes() {
 
   async function loadData() {
     try {
-      const [mats, frents, forns] = await Promise.all([getMateriais(), getFrentes(), getFornecedores()]);
+      const [mats, frents, forns, hist] = await Promise.all([
+        getMateriais(), 
+        getFrentes(), 
+        getFornecedores(),
+        getHistoricoMovimentacoes()
+      ]);
       setMateriais(mats);
       setFrentes(frents);
       setFornecedores(forns);
+      setHistorico(hist);
     } catch (error) {
       console.error("Erro ao carregar listas", error);
     }
@@ -121,7 +133,7 @@ export default function Movimentacoes() {
       setFormData(prev => ({ ...prev, quantidade: '', preco_unitario: '', nf: '', requisicao: '', observacoes: '' }));
       setMaterialSearch('');
       setFormData(prev => ({ ...prev, materialId: '' }));
-      loadData(); // recarrega estoques
+      loadData(); // recarrega estoques e historico
     } catch (error) {
       console.error("Erro transação:", error);
       setMessage({ type: 'error', text: error.message });
@@ -135,6 +147,64 @@ export default function Movimentacoes() {
     const search = materialSearch.toLowerCase();
     return (m.descricao || '').toLowerCase().includes(search) || (m.codigo_descricao || '').toLowerCase().includes(search);
   });
+
+  function exportPDF() {
+    const doc = new jsPDF();
+    doc.setFontSize(16);
+    doc.text('Relatório de Movimentações Recentes', 14, 15);
+    doc.setFontSize(10);
+    doc.text("Gerado em: " + format(new Date(), "dd/MM/yyyy HH:mm"), 14, 22);
+
+    const tableColumn = ["Data", "Tipo", "Material", "Qtd", "Responsável"];
+    const tableRows = [];
+
+    // Pegar apenas os 50 mais recentes pro PDF na tela de Movimentações pra não ficar gigante
+    const recentes = historico.slice(0, 50);
+
+    recentes.forEach(h => {
+      const mat = materiais.find(m => m.id === h.materialId);
+      const dataStr = h.dataRegistro ? format(h.dataRegistro.toDate(), 'dd/MM/yyyy HH:mm') : '-';
+      const tipoStr = h.tipo;
+      const matStr = mat ? ((mat.codigo_descricao ? mat.codigo_descricao+' - ' : '') + mat.descricao) : 'Desconhecido';
+      
+      let respStr = h.operadorNome;
+      if (h.tipo === 'SAIDA' || h.tipo === 'DEVOLUCAO') respStr = h.responsavelId;
+      
+      tableRows.push([dataStr, tipoStr, matStr, h.quantidade, respStr]);
+    });
+
+    doc.autoTable({
+      head: [tableColumn], body: tableRows, startY: 28, theme: 'grid', styles: { fontSize: 8 }, headStyles: { fillColor: [0, 82, 204] }
+    });
+    doc.save('movimentacoes_recentes.pdf');
+  }
+
+  function exportExcel() {
+    const dataToExport = historico.map(h => {
+      const mat = materiais.find(m => m.id === h.materialId);
+      const forn = fornecedores.find(f => f.id === h.fornecedorId);
+      const frente = frentes.find(f => f.id === h.frenteTrabalhoId);
+
+      return {
+        'Data Hora': h.dataRegistro ? format(h.dataRegistro.toDate(), 'dd/MM/yyyy HH:mm') : '-',
+        'Tipo Movimento': h.tipo,
+        'Cód. Material': mat?.codigo_descricao || '',
+        'Descrição Material': mat?.descricao || 'Desconhecido',
+        'Quantidade': h.quantidade,
+        'Preço Unitário': h.preco_unitario,
+        'Operador Sistema': h.operadorNome,
+        'Fornecedor (Entrada)': forn ? forn.razao_social : (h.fornecedorId || '-'),
+        'NF (Entrada)': h.nf || '-',
+        'Destino/Origem (Frente)': frente ? frente.nome : (h.frenteTrabalhoId || '-'),
+        'Responsável (Saída/Dev)': h.responsavelId || '-'
+      };
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Movimentacoes_Completas");
+    XLSX.writeFile(workbook, "movimentacoes_completas.xlsx");
+  }
 
   return (
     <div className="animate-fade-in" style={{ maxWidth: '800px', margin: '0 auto', paddingBottom: '2rem' }}>
@@ -197,7 +267,7 @@ export default function Movimentacoes() {
         </div>
       )}
 
-      <div className="card">
+      <div className="card" style={{ marginBottom: '2rem' }}>
         <form onSubmit={handleSubmit}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
             
@@ -329,6 +399,65 @@ export default function Movimentacoes() {
             </button>
           </div>
         </form>
+      </div>
+
+      <div className="card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
+          <h3 style={{ fontSize: '1.1rem' }}>Histórico Geral de Movimentações</h3>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button className="btn btn-outline" onClick={exportExcel} style={{ color: 'var(--success)', borderColor: 'var(--success)', fontSize: '0.85rem', padding: '0.4rem 0.8rem' }}>
+              <FileSpreadsheet size={16} /> Exportar Excel
+            </button>
+            <button className="btn btn-outline" onClick={exportPDF} style={{ fontSize: '0.85rem', padding: '0.4rem 0.8rem' }}>
+              <Download size={16} /> Imprimir PDF Recentes
+            </button>
+          </div>
+        </div>
+
+        <div style={{ overflowX: 'auto' }}>
+          {historico.length === 0 ? (
+            <p style={{ color: 'var(--text-muted)' }}>Nenhuma movimentação registrada no sistema.</p>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
+                  <th style={{ padding: '0.75rem', fontWeight: '600' }}>Data</th>
+                  <th style={{ padding: '0.75rem', fontWeight: '600' }}>Tipo</th>
+                  <th style={{ padding: '0.75rem', fontWeight: '600' }}>Material</th>
+                  <th style={{ padding: '0.75rem', fontWeight: '600' }}>Qtd</th>
+                  <th style={{ padding: '0.75rem', fontWeight: '600' }}>Responsável</th>
+                </tr>
+              </thead>
+              <tbody>
+                {historico.slice(0, 10).map(h => {
+                  const mat = materiais.find(m => m.id === h.materialId);
+                  return (
+                    <tr key={h.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                      <td style={{ padding: '0.75rem' }}>{h.dataRegistro ? format(h.dataRegistro.toDate(), "dd/MM HH:mm") : '-'}</td>
+                      <td style={{ padding: '0.75rem' }}>
+                        <span style={{ 
+                          padding: '0.15rem 0.35rem', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 'bold',
+                          backgroundColor: h.tipo === 'ENTRADA' ? 'var(--success)20' : (h.tipo === 'DEVOLUCAO' ? 'var(--info)20' : 'var(--warning)20'),
+                          color: h.tipo === 'ENTRADA' ? 'var(--success)' : (h.tipo === 'DEVOLUCAO' ? 'var(--info)' : 'var(--warning)')
+                        }}>
+                          {h.tipo}
+                        </span>
+                      </td>
+                      <td style={{ padding: '0.75rem', fontWeight: '500' }}>{mat?.descricao || 'Desconhecido'}</td>
+                      <td style={{ padding: '0.75rem' }}>{h.quantidade}</td>
+                      <td style={{ padding: '0.75rem' }}>{h.tipo === 'ENTRADA' ? h.operadorNome : h.responsavelId}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          )}
+          {historico.length > 10 && (
+             <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+               Mostrando os 10 mais recentes na tela. Exporte para Excel para ver os {historico.length}.
+             </div>
+          )}
+        </div>
       </div>
     </div>
   );

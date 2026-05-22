@@ -65,7 +65,7 @@ export default function MainLayout() {
           <div style={{ backgroundColor: 'var(--primary-light)', color: 'var(--primary)', padding: '0.5rem', borderRadius: '8px' }}>
             <Package size={24} />
           </div>
-          <span style={{ fontWeight: 'bold', fontSize: '1.25rem', color: 'var(--text-main)' }}>ERP Starta</span>
+          <span style={{ fontWeight: 'bold', fontSize: '1.25rem', color: 'var(--text-main)' }}>R&C Controles</span>
           
           <button 
             className="mobile-only"

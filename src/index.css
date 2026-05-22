@@ -187,6 +187,17 @@ button {
   position: sticky;
   top: 0;
   z-index: 10;
+  padding: 0; /* Removing padding from th to apply on resizer */
+}
+
+.excel-table .resizer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  resize: horizontal;
+  overflow: hidden;
+  padding: 0.5rem 0.75rem;
+  min-width: 50px;
 }
 
 .excel-table tbody tr:hover {

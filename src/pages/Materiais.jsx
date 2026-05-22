@@ -191,14 +191,14 @@ export default function Materiais() {
             <table className="excel-table">
               <thead>
                 <tr>
-                  <th>Cód.</th>
-                  <th>Descrição</th>
-                  <th>Tipo</th>
-                  <th>Fornecedor Padrão</th>
-                  <th style={{ textAlign: 'right' }}>Estoque</th>
-                  <th style={{ textAlign: 'right' }}>Preço Médio</th>
-                  <th style={{ textAlign: 'right' }}>Valor Total</th>
-                  <th style={{ textAlign: 'center' }}>Ações</th>
+                  <th><div className="resizer">Cód.</div></th>
+                  <th><div className="resizer">Descrição</div></th>
+                  <th><div className="resizer">Tipo</div></th>
+                  <th><div className="resizer">Fornecedor Padrão</div></th>
+                  <th style={{ textAlign: 'right' }}><div className="resizer" style={{ justifyContent: 'flex-end' }}>Estoque</div></th>
+                  <th style={{ textAlign: 'right' }}><div className="resizer" style={{ justifyContent: 'flex-end' }}>Preço Médio</div></th>
+                  <th style={{ textAlign: 'right' }}><div className="resizer" style={{ justifyContent: 'flex-end' }}>Valor Total</div></th>
+                  <th style={{ textAlign: 'center' }}><div className="resizer" style={{ justifyContent: 'center' }}>Ações</div></th>
                 </tr>
               </thead>
               <tbody>

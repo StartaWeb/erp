@@ -16,6 +16,7 @@ export default function MateriaisAlugados() {
     frenteId: '',
     data_entrada: '',
     data_previa_saida: '',
+    data_devolucao_real: '',
     status: 'EM USO',
     observacoes: ''
   });
@@ -80,7 +81,7 @@ export default function MateriaisAlugados() {
     setShowModal(false);
     setEditingId(null);
     setFormData({
-      descricao: '', frenteId: '', data_entrada: '', data_previa_saida: '', status: 'EM USO', observacoes: ''
+      descricao: '', frenteId: '', data_entrada: '', data_previa_saida: '', data_devolucao_real: '', status: 'EM USO', observacoes: ''
     });
   }
 
@@ -95,6 +96,7 @@ export default function MateriaisAlugados() {
       frenteId: m.frenteId || '',
       data_entrada: m.data_entrada || '',
       data_previa_saida: m.data_previa_saida || '',
+      data_devolucao_real: m.data_devolucao_real || '',
       status: m.status || 'EM USO',
       observacoes: m.observacoes || ''
     });
@@ -201,12 +203,16 @@ export default function MateriaisAlugados() {
                   <td style={{ padding: '1rem', fontWeight: '500' }}>{m.descricao}</td>
                   <td style={{ padding: '1rem' }}>{getFrenteNome(m.frenteId)}</td>
                   <td style={{ padding: '1rem' }}>{m.data_entrada ? format(new Date(m.data_entrada), 'dd/MM/yyyy') : '-'}</td>
-                  <td style={{ padding: '1rem' }}>{m.data_previa_saida ? format(new Date(m.data_previa_saida), 'dd/MM/yyyy') : '-'}</td>
+                  <td style={{ padding: '1rem' }}>
+                    {m.status === 'DEVOLVIDO' && m.data_devolucao_real 
+                      ? <span style={{color: 'var(--success)', fontWeight: '500'}}>Devolvido em {format(new Date(m.data_devolucao_real), 'dd/MM/yyyy')}</span> 
+                      : m.data_previa_saida ? format(new Date(m.data_previa_saida), 'dd/MM/yyyy') : '-'}
+                  </td>
                   <td style={{ padding: '1rem' }}>
                     <span style={{ 
                       padding: '0.25rem 0.5rem', borderRadius: '4px', fontSize: '0.8rem',
-                      backgroundColor: m.status === 'EM USO' ? 'var(--primary-light)' : (m.status === 'MANUTENÇÃO' ? 'var(--warning)20' : 'var(--text-muted)20'),
-                      color: m.status === 'EM USO' ? 'var(--primary)' : (m.status === 'MANUTENÇÃO' ? '#b37700' : 'var(--text-muted)')
+                      backgroundColor: m.status === 'EM USO' ? 'var(--primary-light)' : (m.status === 'MANUTENÇÃO' ? 'var(--warning)20' : 'var(--success)20'),
+                      color: m.status === 'EM USO' ? 'var(--primary)' : (m.status === 'MANUTENÇÃO' ? '#b37700' : 'var(--success)')
                     }}>
                       {m.status}
                     </span>
@@ -257,14 +263,21 @@ export default function MateriaisAlugados() {
                   <input type="date" className="form-input" value={formData.data_previa_saida} onChange={e => setFormData({...formData, data_previa_saida: e.target.value})} />
                 </div>
                 
-                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                <div className="form-group" style={{ gridColumn: formData.status === 'DEVOLVIDO' ? '1 / 2' : '1 / -1' }}>
                   <label className="form-label">Status *</label>
                   <select className="form-input" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})}>
                     <option value="EM USO">EM USO</option>
                     <option value="MANUTENÇÃO">MANUTENÇÃO</option>
-                    <option value="DEVOLVIDO/DESCARTE">DEVOLVIDO/DESCARTE</option>
+                    <option value="DEVOLVIDO">DEVOLVIDO</option>
                   </select>
                 </div>
+
+                {formData.status === 'DEVOLVIDO' && (
+                  <div className="form-group">
+                    <label className="form-label">Data de Devolução Real *</label>
+                    <input required type="date" className="form-input" value={formData.data_devolucao_real} onChange={e => setFormData({...formData, data_devolucao_real: e.target.value})} />
+                  </div>
+                )}
 
                 <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                   <label className="form-label">Observações</label>
