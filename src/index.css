@@ -159,3 +159,40 @@ button {
   box-shadow: 0 0 0 3px var(--primary-light);
   outline: none;
 }
+
+/* Excel-like Table Styles */
+.excel-table-container {
+  overflow-x: auto;
+  border: 1px solid var(--border-color);
+  background: white;
+}
+
+.excel-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.excel-table th, .excel-table td {
+  border: 1px solid var(--border-color);
+  padding: 0.5rem 0.75rem;
+  white-space: nowrap;
+}
+
+.excel-table th {
+  background-color: #f3f2f1;
+  color: var(--text-main);
+  font-weight: 600;
+  border-bottom: 2px solid var(--border-color);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.excel-table tbody tr:hover {
+  background-color: var(--primary-light);
+}
+
+.excel-table td {
+  color: var(--text-main);
+}

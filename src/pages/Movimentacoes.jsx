@@ -1,15 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { getMateriais, getFrentes, registrarEntrada, registrarSaida } from '../services/db';
-import { ArrowDownLeft, ArrowUpRight, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { getMateriais, getFrentes, getFornecedores, registrarEntrada, registrarSaida, registrarDevolucao } from '../services/db';
+import { ArrowDownLeft, ArrowUpRight, RotateCcw, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 export default function Movimentacoes() {
   const { userProfile, currentUser } = useAuth();
   const [activeTab, setActiveTab] = useState('ENTRADA');
   const [materiais, setMateriais] = useState([]);
   const [frentes, setFrentes] = useState([]);
+  const [fornecedores, setFornecedores] = useState([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
+
+  // Autocomplete state
+  const [materialSearch, setMaterialSearch] = useState('');
+  const [showDropdown, setShowDropdown] = useState(false);
 
   const [formData, setFormData] = useState({
     materialId: '',
@@ -18,15 +23,18 @@ export default function Movimentacoes() {
     fornecedorId: '',
     nf: '',
     preco_unitario: '',
-    // Campos Saída
+    // Campos Saída e Devolução
     frenteTrabalhoId: '',
+    // Extra Saída
     empresa: '',
     coletor: '',
     vala_mnd: '',
     responsavelId: '',
     requisicao: '',
     equipamento: '',
-    placa_serie: ''
+    placa_serie: '',
+    // Extra Devolução
+    observacoes: ''
   });
 
   useEffect(() => {
@@ -35,9 +43,10 @@ export default function Movimentacoes() {
 
   async function loadData() {
     try {
-      const [mats, frents] = await Promise.all([getMateriais(), getFrentes()]);
+      const [mats, frents, forns] = await Promise.all([getMateriais(), getFrentes(), getFornecedores()]);
       setMateriais(mats);
       setFrentes(frents);
+      setFornecedores(forns);
     } catch (error) {
       console.error("Erro ao carregar listas", error);
     }
@@ -45,6 +54,12 @@ export default function Movimentacoes() {
 
   function handleInputChange(e) {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+  }
+
+  function handleMaterialSelect(m) {
+    setFormData({ ...formData, materialId: m.id });
+    setMaterialSearch(`${m.codigo_descricao ? '[' + m.codigo_descricao + '] ' : ''}${m.descricao}`);
+    setShowDropdown(false);
   }
 
   async function handleSubmit(e) {
@@ -67,8 +82,7 @@ export default function Movimentacoes() {
         }, formData.materialId, formData.quantidade, formData.preco_unitario);
         
         setMessage({ type: 'success', text: 'Entrada registrada com sucesso!' });
-      } else {
-        // Validação dupla (simulada na interface, idealmente deve pedir senha ou confirmação via push)
+      } else if (activeTab === 'SAIDA') {
         if (!formData.responsavelId) {
           throw new Error('A validação do responsável é obrigatória para retiradas.');
         }
@@ -87,10 +101,26 @@ export default function Movimentacoes() {
         }, formData.materialId, formData.quantidade);
 
         setMessage({ type: 'success', text: 'Saída registrada com sucesso!' });
+      } else if (activeTab === 'DEVOLUCAO') {
+        if (!formData.frenteTrabalhoId) {
+          throw new Error('A Frente de Trabalho de origem é obrigatória para devoluções.');
+        }
+
+        await registrarDevolucao({
+          frenteTrabalhoId: formData.frenteTrabalhoId,
+          responsavelId: formData.responsavelId,
+          observacoes: formData.observacoes,
+          operadorId: currentUser.uid,
+          operadorNome: userProfile?.nome || currentUser.email
+        }, formData.materialId, formData.quantidade);
+
+        setMessage({ type: 'success', text: 'Devolução registrada com sucesso!' });
       }
       
       // Limpa form parcial
-      setFormData(prev => ({ ...prev, quantidade: '', preco_unitario: '', nf: '', requisicao: '' }));
+      setFormData(prev => ({ ...prev, quantidade: '', preco_unitario: '', nf: '', requisicao: '', observacoes: '' }));
+      setMaterialSearch('');
+      setFormData(prev => ({ ...prev, materialId: '' }));
       loadData(); // recarrega estoques
     } catch (error) {
       console.error("Erro transação:", error);
@@ -101,16 +131,21 @@ export default function Movimentacoes() {
   }
 
   const selectedMaterial = materiais.find(m => m.id === formData.materialId);
+  const filteredMateriais = materiais.filter(m => {
+    const search = materialSearch.toLowerCase();
+    return (m.descricao || '').toLowerCase().includes(search) || (m.codigo_descricao || '').toLowerCase().includes(search);
+  });
 
   return (
-    <div className="animate-fade-in" style={{ maxWidth: '800px', margin: '0 auto' }}>
+    <div className="animate-fade-in" style={{ maxWidth: '800px', margin: '0 auto', paddingBottom: '2rem' }}>
       <h1 style={{ fontSize: '1.5rem', color: 'var(--text-main)', marginBottom: '1.5rem' }}>Registro de Movimentações</h1>
 
-      <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }}>
+      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '2rem', flexWrap: 'wrap' }}>
         <button 
+          type="button"
           onClick={() => { setActiveTab('ENTRADA'); setMessage(null); }}
           style={{ 
-            flex: 1, padding: '1rem', borderRadius: 'var(--radius-md)', border: 'none', cursor: 'pointer',
+            flex: 1, minWidth: '150px', padding: '1rem', borderRadius: 'var(--radius-md)', border: 'none', cursor: 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
             backgroundColor: activeTab === 'ENTRADA' ? 'var(--success)' : 'var(--bg-card)',
             color: activeTab === 'ENTRADA' ? '#fff' : 'var(--text-muted)',
@@ -118,12 +153,13 @@ export default function Movimentacoes() {
             transition: 'all 0.2s'
           }}
         >
-          <ArrowDownLeft size={24} /> <h2>Entrada</h2>
+          <ArrowDownLeft size={20} /> <span style={{ fontWeight: '600' }}>Entrada</span>
         </button>
         <button 
+          type="button"
           onClick={() => { setActiveTab('SAIDA'); setMessage(null); }}
           style={{ 
-            flex: 1, padding: '1rem', borderRadius: 'var(--radius-md)', border: 'none', cursor: 'pointer',
+            flex: 1, minWidth: '150px', padding: '1rem', borderRadius: 'var(--radius-md)', border: 'none', cursor: 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
             backgroundColor: activeTab === 'SAIDA' ? 'var(--warning)' : 'var(--bg-card)',
             color: activeTab === 'SAIDA' ? '#fff' : 'var(--text-muted)',
@@ -131,7 +167,21 @@ export default function Movimentacoes() {
             transition: 'all 0.2s'
           }}
         >
-          <ArrowUpRight size={24} /> <h2>Saída</h2>
+          <ArrowUpRight size={20} /> <span style={{ fontWeight: '600' }}>Saída</span>
+        </button>
+        <button 
+          type="button"
+          onClick={() => { setActiveTab('DEVOLUCAO'); setMessage(null); }}
+          style={{ 
+            flex: 1, minWidth: '150px', padding: '1rem', borderRadius: 'var(--radius-md)', border: 'none', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+            backgroundColor: activeTab === 'DEVOLUCAO' ? 'var(--info)' : 'var(--bg-card)',
+            color: activeTab === 'DEVOLUCAO' ? '#fff' : 'var(--text-muted)',
+            boxShadow: activeTab === 'DEVOLUCAO' ? 'var(--shadow-md)' : 'var(--shadow-sm)',
+            transition: 'all 0.2s'
+          }}
+        >
+          <RotateCcw size={20} /> <span style={{ fontWeight: '600' }}>Devolução</span>
         </button>
       </div>
 
@@ -151,14 +201,48 @@ export default function Movimentacoes() {
         <form onSubmit={handleSubmit}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
             
-            <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-              <label className="form-label">Selecionar Material *</label>
-              <select required name="materialId" className="form-input" value={formData.materialId} onChange={handleInputChange}>
-                <option value="">-- Escolha o Material --</option>
-                {materiais.map(m => (
-                  <option key={m.id} value={m.id}>{m.codigo_descricao ? '[' + m.codigo_descricao + '] ' : ''}{m.descricao} (Estoque: {m.estoque_atual} {m.unidade})</option>
-                ))}
-              </select>
+            <div className="form-group" style={{ gridColumn: '1 / -1', position: 'relative' }}>
+              <label className="form-label">Selecionar Material (Pesquise) *</label>
+              <input 
+                required={!formData.materialId}
+                type="text" 
+                className="form-input" 
+                placeholder="Digite o código ou nome do material..."
+                value={materialSearch}
+                onChange={e => {
+                  setMaterialSearch(e.target.value);
+                  setShowDropdown(true);
+                  if (formData.materialId) setFormData({...formData, materialId: ''});
+                }}
+                onFocus={() => setShowDropdown(true)}
+              />
+              {showDropdown && materialSearch && (
+                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, backgroundColor: 'white', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', zIndex: 10, maxHeight: '200px', overflowY: 'auto', boxShadow: 'var(--shadow-md)' }}>
+                  {filteredMateriais.length === 0 ? (
+                    <div style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)' }}>Nenhum material encontrado.</div>
+                  ) : (
+                    filteredMateriais.map(m => (
+                      <div 
+                        key={m.id} 
+                        onClick={() => handleMaterialSelect(m)}
+                        style={{ padding: '0.75rem 1rem', cursor: 'pointer', borderBottom: '1px solid #f4f5f7' }}
+                        onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--primary-light)'}
+                        onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                      >
+                        <strong>{m.codigo_descricao ? `[${m.codigo_descricao}] ` : ''}</strong>{m.descricao}
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                          Estoque: {m.estoque_atual} {m.unidade}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+              {formData.materialId && (
+                <div style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                  <CheckCircle2 size={14} /> Material selecionado
+                </div>
+              )}
             </div>
 
             <div className="form-group">
@@ -181,8 +265,11 @@ export default function Movimentacoes() {
             {activeTab === 'ENTRADA' && (
               <>
                 <div className="form-group">
-                  <label className="form-label">Fornecedor / Loja</label>
-                  <input type="text" name="fornecedorId" className="form-input" placeholder="Nome ou Razão Social" value={formData.fornecedorId} onChange={handleInputChange} />
+                  <label className="form-label">Fornecedor *</label>
+                  <select required name="fornecedorId" className="form-input" value={formData.fornecedorId} onChange={handleInputChange}>
+                    <option value="">-- Selecione o Fornecedor --</option>
+                    {fornecedores.map(f => <option key={f.id} value={f.id}>{f.razao_social}</option>)}
+                  </select>
                 </div>
                 <div className="form-group">
                   <label className="form-label">Número da NF</label>
@@ -191,19 +278,24 @@ export default function Movimentacoes() {
               </>
             )}
 
-            {activeTab === 'SAIDA' && (
+            {(activeTab === 'SAIDA' || activeTab === 'DEVOLUCAO') && (
               <>
                 <div className="form-group">
-                  <label className="form-label">Frente de Trabalho / Destino *</label>
+                  <label className="form-label">{activeTab === 'SAIDA' ? 'Destino' : 'Origem'} (Frente de Trabalho) *</label>
                   <select required name="frenteTrabalhoId" className="form-input" value={formData.frenteTrabalhoId} onChange={handleInputChange}>
-                    <option value="">-- Selecione o Destino --</option>
+                    <option value="">-- Selecione a Frente --</option>
                     {frentes.map(f => <option key={f.id} value={f.id}>{f.nome}</option>)}
                   </select>
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Validação Dupla (Responsável) *</label>
+                  <label className="form-label">Responsável *</label>
                   <input required type="text" name="responsavelId" className="form-input" placeholder="Nome/Assinatura do Encarregado" value={formData.responsavelId} onChange={handleInputChange} />
                 </div>
+              </>
+            )}
+
+            {activeTab === 'SAIDA' && (
+              <>
                 <div className="form-group">
                   <label className="form-label">Requisição Nº</label>
                   <input type="text" name="requisicao" className="form-input" value={formData.requisicao} onChange={handleInputChange} />
@@ -222,11 +314,18 @@ export default function Movimentacoes() {
                 </div>
               </>
             )}
+
+            {activeTab === 'DEVOLUCAO' && (
+              <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                <label className="form-label">Observações / Motivo da Devolução</label>
+                <textarea name="observacoes" className="form-input" rows="3" value={formData.observacoes} onChange={handleInputChange}></textarea>
+              </div>
+            )}
           </div>
 
           <div style={{ marginTop: '2rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'flex-end' }}>
-            <button type="submit" disabled={loading} className="btn btn-primary" style={{ padding: '0.75rem 2rem', fontSize: '1rem' }}>
-              {loading ? 'Registrando...' : ('Confirmar ' + (activeTab === 'ENTRADA' ? 'Entrada' : 'Saída'))}
+            <button type="submit" disabled={loading || !formData.materialId} className="btn btn-primary" style={{ padding: '0.75rem 2rem', fontSize: '1rem' }}>
+              {loading ? 'Registrando...' : ('Confirmar ' + (activeTab === 'ENTRADA' ? 'Entrada' : activeTab === 'SAIDA' ? 'Saída' : 'Devolução'))}
             </button>
           </div>
         </form>

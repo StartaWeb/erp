@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { getFrentes, addFrente } from '../services/db';
-import { Plus, Wrench, MapPin } from 'lucide-react';
+import { getFrentes, addFrente, updateFrente, deleteFrente } from '../services/db';
+import { Plus, Wrench, MapPin, Edit, Trash2 } from 'lucide-react';
 
 export default function Frentes() {
   const [frentes, setFrentes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({
     nome: '',
     tipo: 'OBRA',
@@ -31,18 +32,53 @@ export default function Frentes() {
     }
   }
 
+  function handleNew() {
+    setFormData({ nome: '', tipo: 'OBRA', status: 'ATIVO', encarregadoId: '', localizacao: '' });
+    setEditingId(null);
+    setShowModal(true);
+  }
+
+  function handleEdit(f) {
+    setFormData({
+      nome: f.nome || '',
+      tipo: f.tipo || 'OBRA',
+      status: f.status || 'ATIVO',
+      encarregadoId: f.encarregadoId || '',
+      localizacao: f.localizacao || ''
+    });
+    setEditingId(f.id);
+    setShowModal(true);
+  }
+
+  async function handleDelete(id) {
+    if (window.confirm("Tem certeza que deseja excluir esta frente de trabalho?")) {
+      try {
+        await deleteFrente(id);
+        alert('Frente de trabalho excluída com sucesso!');
+        loadFrentes();
+      } catch (error) {
+        console.error("Erro ao excluir:", error);
+        alert("Erro ao excluir a frente de trabalho.");
+      }
+    }
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     if (isSubmitting) return;
     try {
       setIsSubmitting(true);
-      await addFrente(formData);
+      if (editingId) {
+        await updateFrente(editingId, formData);
+        alert("Frente atualizada com sucesso!");
+      } else {
+        await addFrente(formData);
+        alert("Frente cadastrada com sucesso!");
+      }
       setShowModal(false);
-      setFormData({ nome: '', tipo: 'OBRA', status: 'ATIVO', encarregadoId: '', localizacao: '' });
-      alert("Frente cadastrada com sucesso!");
       loadFrentes();
     } catch (error) {
-      console.error("Erro ao adicionar frente:", error);
+      console.error("Erro ao salvar frente:", error);
       alert("Erro ao salvar.");
     } finally {
       setIsSubmitting(false);
@@ -56,7 +92,7 @@ export default function Frentes() {
           <h1 style={{ fontSize: '1.5rem', color: 'var(--text-main)', marginBottom: '0.25rem' }}>Frentes de Trabalho</h1>
           <p style={{ color: 'var(--text-muted)' }}>Obras, Valas e Locais de Destino dos materiais</p>
         </div>
-        <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+        <button className="btn btn-primary" onClick={handleNew}>
           <Plus size={18} /> Nova Frente
         </button>
       </div>
@@ -94,8 +130,12 @@ export default function Frentes() {
                 )}
               </div>
               
-              <div style={{ paddingTop: '1rem', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between' }}>
+              <div style={{ paddingTop: '1rem', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Encarregado: {frente.encarregadoId || 'Não atribuído'}</span>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button onClick={() => handleEdit(frente)} style={{ background: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><Edit size={16} /></button>
+                  <button onClick={() => handleDelete(frente.id)} style={{ background: 'none', color: 'var(--danger)', cursor: 'pointer' }}><Trash2 size={16} /></button>
+                </div>
               </div>
             </div>
           ))
@@ -106,8 +146,8 @@ export default function Frentes() {
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '2rem 1rem', overflowY: 'auto' }}>
           <div className="card animate-fade-in" style={{ width: '100%', maxWidth: '500px', margin: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <h2 style={{ fontSize: '1.25rem' }}>Nova Frente de Trabalho</h2>
-              <button onClick={() => setShowModal(false)} style={{ background: 'none', color: 'var(--text-muted)' }}>X</button>
+              <h2 style={{ fontSize: '1.25rem' }}>{editingId ? 'Editar Frente' : 'Nova Frente de Trabalho'}</h2>
+              <button onClick={() => setShowModal(false)} style={{ background: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>X</button>
             </div>
             
             <form onSubmit={handleSubmit}>

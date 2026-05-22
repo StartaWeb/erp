@@ -8,6 +8,8 @@ import Materiais from './pages/Materiais';
 import Frentes from './pages/Frentes';
 import Movimentacoes from './pages/Movimentacoes';
 import Relatorios from './pages/Relatorios';
+import Fornecedores from './pages/Fornecedores';
+import MateriaisAlugados from './pages/MateriaisAlugados';
 import MainLayout from './components/MainLayout';
 
 function PrivateRoute({ children }) {
@@ -33,6 +35,8 @@ function AppRoutes() {
         <Route path="materiais" element={<Materiais />} />
         <Route path="movimentacoes" element={<Movimentacoes />} />
         <Route path="frentes" element={<Frentes />} />
+        <Route path="fornecedores" element={<Fornecedores />} />
+        <Route path="materiais-alugados" element={<MateriaisAlugados />} />
         <Route path="relatorios" element={<Relatorios />} />
         <Route path="usuarios" element={<div className="card">Gestão de Usuários em desenvolvimento...</div>} />
       </Route>

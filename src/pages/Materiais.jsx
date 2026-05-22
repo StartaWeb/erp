@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
-import { getMateriais, addMaterial, updateMaterial } from '../services/db';
-import { Plus, Search, Package, Edit, Camera } from 'lucide-react';
+import { getMateriais, addMaterial, updateMaterial, getFornecedores } from '../services/db';
+import { Plus, Search, Package, Edit, Camera, Download } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 export default function Materiais() {
   const [materiais, setMateriais] = useState([]);
+  const [fornecedores, setFornecedores] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
@@ -16,22 +18,27 @@ export default function Materiais() {
     estoque_atual: 0,
     estoque_minimo: 0,
     preco_unitario_medio: 0,
+    fornecedorId: '',
     status: 'ATIVO'
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    loadMateriais();
+    loadData();
   }, []);
 
-  async function loadMateriais() {
+  async function loadData() {
     try {
       setLoading(true);
-      const data = await getMateriais();
-      setMateriais(data);
+      const [mats, forns] = await Promise.all([
+        getMateriais(),
+        getFornecedores()
+      ]);
+      setMateriais(mats);
+      setFornecedores(forns);
     } catch (error) {
-      console.error("Erro ao buscar materiais:", error);
-      alert("Para ver os materiais, você precisa habilitar o Firestore no Firebase Console (Build > Firestore Database > Create Database > Start in Test Mode).");
+      console.error("Erro ao buscar dados:", error);
+      alert("Para ver os materiais, você precisa habilitar o Firestore no Firebase Console.");
     } finally {
       setLoading(false);
     }
@@ -50,10 +57,10 @@ export default function Materiais() {
         alert('Material cadastrado com sucesso!');
       }
       closeModal();
-      loadMateriais();
+      loadData();
     } catch (error) {
       console.error("Erro ao salvar:", error);
-      alert("Erro ao salvar o material. Verifique as permissões do Firestore e se os dados são válidos.");
+      alert("Erro ao salvar o material.");
     } finally {
       setIsSubmitting(false);
     }
@@ -64,7 +71,8 @@ export default function Materiais() {
     setEditingId(null);
     setFormData({
       codigo_descricao: '', descricao: '', tipo: 'MATERIAL', 
-      unidade: 'UN', estoque_atual: 0, estoque_minimo: 0, preco_unitario_medio: 0, status: 'ATIVO'
+      unidade: 'UN', estoque_atual: 0, estoque_minimo: 0, preco_unitario_medio: 0, 
+      fornecedorId: '', status: 'ATIVO'
     });
   }
 
@@ -82,10 +90,50 @@ export default function Materiais() {
       estoque_atual: m.estoque_atual || 0,
       estoque_minimo: m.estoque_minimo || 0,
       preco_unitario_medio: m.preco_unitario_medio || 0,
+      fornecedorId: m.fornecedorId || '',
       status: m.status || 'ATIVO'
     });
     setEditingId(m.id);
     setShowModal(true);
+  }
+
+  function exportToExcel() {
+    const dataToExport = filtered.map(m => {
+      const fornecedor = fornecedores.find(f => f.id === m.fornecedorId);
+      const valorTotal = Number(m.estoque_atual || 0) * Number(m.preco_unitario_medio || 0);
+      return {
+        'CÓDIGO': m.codigo_descricao,
+        'DESCRIÇÃO': m.descricao,
+        'TIPO': m.tipo,
+        'UNIDADE': m.unidade,
+        'FORNECEDOR PADRÃO': fornecedor ? fornecedor.razao_social : '-',
+        'ESTOQUE MÍNIMO': m.estoque_minimo,
+        'ESTOQUE ATUAL': m.estoque_atual,
+        'PREÇO MÉDIO (R$)': Number(m.preco_unitario_medio || 0).toFixed(2),
+        'VALOR TOTAL (R$)': valorTotal.toFixed(2)
+      };
+    });
+
+    // Calcula somatório final
+    const somaTotal = dataToExport.reduce((acc, curr) => acc + Number(curr['VALOR TOTAL (R$)']), 0);
+    
+    // Adiciona linha de totalização
+    dataToExport.push({
+      'CÓDIGO': '',
+      'DESCRIÇÃO': 'TOTAL GERAL',
+      'TIPO': '',
+      'UNIDADE': '',
+      'FORNECEDOR PADRÃO': '',
+      'ESTOQUE MÍNIMO': '',
+      'ESTOQUE ATUAL': '',
+      'PREÇO MÉDIO (R$)': '',
+      'VALOR TOTAL (R$)': somaTotal.toFixed(2)
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Materiais");
+    XLSX.writeFile(workbook, "Relatorio_Materiais.xlsx");
   }
 
   const filtered = materiais.filter(m => {
@@ -99,12 +147,17 @@ export default function Materiais() {
     <div className="animate-fade-in">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h1 style={{ fontSize: '1.5rem', color: 'var(--text-main)', marginBottom: '0.25rem' }}>Materiais</h1>
+          <h1 style={{ fontSize: '1.5rem', color: 'var(--text-main)', marginBottom: '0.25rem' }}>Materiais e Inventário</h1>
           <p style={{ color: 'var(--text-muted)' }}>Gerencie o catálogo e o estoque de materiais</p>
         </div>
-        <button className="btn btn-primary" onClick={handleNew}>
-          <Plus size={18} /> Novo Material
-        </button>
+        <div style={{ display: 'flex', gap: '1rem' }}>
+          <button className="btn btn-outline" onClick={exportToExcel} style={{ color: '#107c41', borderColor: '#107c41' }}>
+            <Download size={18} /> Exportar Excel
+          </button>
+          <button className="btn btn-primary" onClick={handleNew}>
+            <Plus size={18} /> Novo Material
+          </button>
+        </div>
       </div>
 
       <div className="card" style={{ marginBottom: '1.5rem' }}>
@@ -134,49 +187,60 @@ export default function Materiais() {
             <p>Nenhum material encontrado.</p>
           </div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid var(--border-color)', backgroundColor: 'var(--bg-app)' }}>
-                <th style={{ padding: '1rem', fontWeight: '500', color: 'var(--text-muted)' }}>Cód.</th>
-                <th style={{ padding: '1rem', fontWeight: '500', color: 'var(--text-muted)' }}>Descrição</th>
-                <th style={{ padding: '1rem', fontWeight: '500', color: 'var(--text-muted)' }}>Tipo</th>
-                <th style={{ padding: '1rem', fontWeight: '500', color: 'var(--text-muted)' }}>Estoque</th>
-                <th style={{ padding: '1rem', fontWeight: '500', color: 'var(--text-muted)' }}>Preço Médio</th>
-                <th style={{ padding: '1rem', fontWeight: '500', color: 'var(--text-muted)' }}>Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(m => (
-                <tr key={m.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                  <td style={{ padding: '1rem' }}>{m.codigo_descricao}</td>
-                  <td style={{ padding: '1rem', fontWeight: '500' }}>{m.descricao}</td>
-                  <td style={{ padding: '1rem' }}>
-                    <span style={{ 
-                      padding: '0.25rem 0.5rem', borderRadius: '4px', fontSize: '0.8rem',
-                      backgroundColor: m.tipo === 'COMBUSTÍVEL' ? 'var(--warning)20' : 'var(--primary-light)',
-                      color: m.tipo === 'COMBUSTÍVEL' ? '#b37700' : 'var(--primary)'
-                    }}>
-                      {m.tipo}
-                    </span>
-                  </td>
-                  <td style={{ padding: '1rem' }}>
-                    <span style={{ fontWeight: '600', color: m.estoque_atual <= (m.estoque_minimo || 0) ? 'var(--danger)' : 'inherit' }}>
-                      {m.estoque_atual}
-                    </span> {m.unidade}
-                    {(m.estoque_minimo > 0) && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Mín: {m.estoque_minimo}</div>}
-                  </td>
-                  <td style={{ padding: '1rem' }}>R$ {Number(m.preco_unitario_medio).toFixed(2)}</td>
-                  <td style={{ padding: '1rem', display: 'flex', gap: '0.5rem' }}>
-                    <button onClick={() => handleEdit(m)} style={{ background: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><Edit size={18} /></button>
-                  </td>
+          <div className="excel-table-container">
+            <table className="excel-table">
+              <thead>
+                <tr>
+                  <th>Cód.</th>
+                  <th>Descrição</th>
+                  <th>Tipo</th>
+                  <th>Fornecedor Padrão</th>
+                  <th style={{ textAlign: 'right' }}>Estoque</th>
+                  <th style={{ textAlign: 'right' }}>Preço Médio</th>
+                  <th style={{ textAlign: 'right' }}>Valor Total</th>
+                  <th style={{ textAlign: 'center' }}>Ações</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filtered.map(m => {
+                  const fornecedor = fornecedores.find(f => f.id === m.fornecedorId);
+                  const valorTotal = Number(m.estoque_atual || 0) * Number(m.preco_unitario_medio || 0);
+                  
+                  return (
+                    <tr key={m.id}>
+                      <td>{m.codigo_descricao}</td>
+                      <td style={{ fontWeight: '500' }}>{m.descricao}</td>
+                      <td>
+                        <span style={{ 
+                          padding: '0.15rem 0.4rem', borderRadius: '4px', fontSize: '0.75rem',
+                          backgroundColor: m.tipo === 'COMBUSTÍVEL' ? 'var(--warning)20' : 'var(--primary-light)',
+                          color: m.tipo === 'COMBUSTÍVEL' ? '#b37700' : 'var(--primary)'
+                        }}>
+                          {m.tipo}
+                        </span>
+                      </td>
+                      <td style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                        {fornecedor ? fornecedor.razao_social : '-'}
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        <span style={{ fontWeight: '600', color: m.estoque_atual <= (m.estoque_minimo || 0) ? 'var(--danger)' : 'inherit' }}>
+                          {m.estoque_atual}
+                        </span> <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{m.unidade}</span>
+                      </td>
+                      <td style={{ textAlign: 'right' }}>R$ {Number(m.preco_unitario_medio || 0).toFixed(2)}</td>
+                      <td style={{ textAlign: 'right', fontWeight: '500' }}>R$ {valorTotal.toFixed(2)}</td>
+                      <td style={{ textAlign: 'center' }}>
+                        <button onClick={() => handleEdit(m)} style={{ background: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><Edit size={16} /></button>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
-      {/* Modal de Novo Material */}
       {showModal && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '1rem', overflowY: 'auto' }}>
           <div className="card animate-fade-in" style={{ width: '100%', maxWidth: '600px', margin: '2rem auto' }}>
@@ -220,6 +284,16 @@ export default function Materiais() {
                     <option value="LT">LT (Litro)</option>
                     <option value="KG">KG (Quilo)</option>
                     <option value="M">M (Metro)</option>
+                  </select>
+                </div>
+
+                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                  <label className="form-label">Fornecedor Padrão (Opcional)</label>
+                  <select className="form-input" value={formData.fornecedorId} onChange={e => setFormData({...formData, fornecedorId: e.target.value})}>
+                    <option value="">Sem fornecedor específico</option>
+                    {fornecedores.map(f => (
+                      <option key={f.id} value={f.id}>{f.razao_social}</option>
+                    ))}
                   </select>
                 </div>
 

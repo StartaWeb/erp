@@ -3,7 +3,7 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { 
   Package, LayoutDashboard, ArrowLeftRight, 
-  LogOut, Menu, X, Users, Wrench, FileText
+  LogOut, Menu, X, Users, Wrench, FileText, Building2, CalendarClock
 } from 'lucide-react';
 
 export default function MainLayout() {
@@ -24,8 +24,10 @@ export default function MainLayout() {
   const menuItems = [
     { path: '/', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/materiais', label: 'Materiais', icon: Package },
+    { path: '/materiais-alugados', label: 'Materiais Alugados', icon: CalendarClock },
     { path: '/movimentacoes', label: 'Movimentações', icon: ArrowLeftRight },
     { path: '/frentes', label: 'Frentes de Trabalho', icon: Wrench },
+    { path: '/fornecedores', label: 'Fornecedores', icon: Building2 },
     { path: '/relatorios', label: 'Relatórios', icon: FileText },
     { path: '/usuarios', label: 'Usuários', icon: Users, adminOnly: true },
   ];

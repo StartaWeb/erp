@@ -1,6 +1,6 @@
 import { db } from '../firebase';
 import { 
-  collection, doc, getDocs, getDoc, addDoc, updateDoc, 
+  collection, doc, getDocs, getDoc, addDoc, updateDoc, deleteDoc,
   query, orderBy, Timestamp, runTransaction
 } from 'firebase/firestore';
 
@@ -61,6 +61,16 @@ export async function addFrente(data) {
   });
 }
 
+export async function updateFrente(id, data) {
+  const docRef = doc(db, 'frentes_trabalho', id);
+  return updateDoc(docRef, data);
+}
+
+export async function deleteFrente(id) {
+  const docRef = doc(db, 'frentes_trabalho', id);
+  return deleteDoc(docRef);
+}
+
 // --- FORNECEDORES ---
 export const fornecedoresRef = collection(db, 'fornecedores');
 
@@ -70,9 +80,53 @@ export async function getFornecedores() {
   return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 }
 
+export async function addFornecedor(data) {
+  return addDoc(fornecedoresRef, {
+    ...data,
+    dataCadastro: Timestamp.now()
+  });
+}
+
+export async function updateFornecedor(id, data) {
+  const docRef = doc(db, 'fornecedores', id);
+  return updateDoc(docRef, data);
+}
+
+export async function deleteFornecedor(id) {
+  const docRef = doc(db, 'fornecedores', id);
+  return deleteDoc(docRef);
+}
+
+// --- MATERIAIS ALUGADOS ---
+export const materiaisAlugadosRef = collection(db, 'materiais_alugados');
+
+export async function getMateriaisAlugados() {
+  const q = query(materiaisAlugadosRef, orderBy('dataCadastro', 'desc'));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+}
+
+export async function addMaterialAlugado(data) {
+  return addDoc(materiaisAlugadosRef, {
+    ...data,
+    dataCadastro: Timestamp.now()
+  });
+}
+
+export async function updateMaterialAlugado(id, data) {
+  const docRef = doc(db, 'materiais_alugados', id);
+  return updateDoc(docRef, data);
+}
+
+export async function deleteMaterialAlugado(id) {
+  const docRef = doc(db, 'materiais_alugados', id);
+  return deleteDoc(docRef);
+}
+
 // --- MOVIMENTAÇÕES (Transações) ---
 export const entradasRef = collection(db, 'entradas');
 export const saidasRef = collection(db, 'saidas');
+export const devolucoesRef = collection(db, 'devolucoes');
 
 export async function registrarEntrada(entradaData, materialId, quantidade, precoUnitario) {
   const materialRef = doc(db, 'materiais', materialId);
@@ -150,16 +204,52 @@ export async function registrarSaida(saidaData, materialId, quantidade) {
   });
 }
 
+export async function registrarDevolucao(devolucaoData, materialId, quantidade) {
+  const materialRef = doc(db, 'materiais', materialId);
+  
+  await runTransaction(db, async (transaction) => {
+    const materialDoc = await transaction.get(materialRef);
+    if (!materialDoc.exists()) {
+      throw new Error("Material não encontrado!");
+    }
+
+    const materialData = materialDoc.data();
+    const estoqueAtual = parseNum(materialData.estoque_atual);
+    const qtdDevolucao = parseNum(quantidade);
+    const precoMedio = parseNum(materialData.preco_unitario_medio);
+
+    const estoqueFinal = estoqueAtual + qtdDevolucao;
+    const valorDevolucao = qtdDevolucao * precoMedio;
+
+    transaction.update(materialRef, {
+      estoque_atual: estoqueFinal
+    });
+
+    const novaDevolucaoRef = doc(devolucoesRef);
+    transaction.set(novaDevolucaoRef, {
+      ...devolucaoData,
+      materialId,
+      quantidade: qtdDevolucao,
+      preco_unitario: precoMedio,
+      preco_total: valorDevolucao,
+      tipo: 'DEVOLUCAO',
+      dataRegistro: Timestamp.now()
+    });
+  });
+}
+
 // --- RELATÓRIOS E HISTÓRICO ---
 export async function getHistoricoMovimentacoes() {
   const entradasSnapshot = await getDocs(query(entradasRef, orderBy('dataRegistro', 'desc')));
   const saidasSnapshot = await getDocs(query(saidasRef, orderBy('dataRegistro', 'desc')));
+  const devolucoesSnapshot = await getDocs(query(devolucoesRef, orderBy('dataRegistro', 'desc')));
   
   const entradas = entradasSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   const saidas = saidasSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  const devolucoes = devolucoesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   
   // Combina e ordena por data descrescente
-  const historico = [...entradas, ...saidas].sort((a, b) => {
+  const historico = [...entradas, ...saidas, ...devolucoes].sort((a, b) => {
     return b.dataRegistro.toMillis() - a.dataRegistro.toMillis();
   });
   
