@@ -4,6 +4,12 @@ import { getMateriais, getHistoricoMovimentacoes, getMateriaisAlugados } from '.
 import { Package, TrendingUp, TrendingDown, AlertTriangle, DollarSign, CalendarClock } from 'lucide-react';
 import { format, isBefore, addDays, isAfter } from 'date-fns';
 
+function safeFormatDate(dateVal, formatStr) {
+  if (!dateVal) return '-';
+  const d = new Date(dateVal);
+  return isNaN(d.getTime()) ? '-' : format(d, formatStr);
+}
+
 export default function Dashboard() {
   const { userProfile } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -195,7 +201,7 @@ export default function Dashboard() {
                   <strong style={{ color: a.tipoAlerta === 'ATRASADO' ? 'var(--danger)' : '#b37700' }}>
                     {a.tipoAlerta === 'ATRASADO' ? 'Atrasado: ' : 'Próximo do Vencimento: '}
                   </strong> 
-                  {a.descricao} (Previsto: {format(new Date(a.data_previa_saida), 'dd/MM/yyyy')})
+                  {a.descricao} (Previsto: {safeFormatDate(a.data_previa_saida, 'dd/MM/yyyy')})
                 </div>
               ))}
             </div>

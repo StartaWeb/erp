@@ -3,6 +3,12 @@ import { getMateriaisAlugados, addMaterialAlugado, updateMaterialAlugado, delete
 import { Plus, Search, CalendarClock, Edit, Trash2, AlertTriangle } from 'lucide-react';
 import { format, isAfter, isBefore, addDays } from 'date-fns';
 
+function safeFormatDate(dateVal, formatStr) {
+  if (!dateVal) return '-';
+  const d = new Date(dateVal);
+  return isNaN(d.getTime()) ? '-' : format(d, formatStr);
+}
+
 export default function MateriaisAlugados() {
   const [materiais, setMateriais] = useState([]);
   const [frentes, setFrentes] = useState([]);
@@ -147,7 +153,7 @@ export default function MateriaisAlugados() {
             <div key={`atraso-${m.id}`} style={{ backgroundColor: 'var(--danger)20', borderLeft: '4px solid var(--danger)', padding: '1rem', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '1rem' }}>
               <AlertTriangle color="var(--danger)" />
               <div>
-                <strong style={{ color: 'var(--danger)' }}>Atrasado!</strong> O material <strong>{m.descricao}</strong> alocado na frente <strong>{getFrenteNome(m.frenteId)}</strong> deveria ter sido devolvido em {format(new Date(m.data_previa_saida), 'dd/MM/yyyy')}.
+                <strong style={{ color: 'var(--danger)' }}>Atrasado!</strong> O material <strong>{m.descricao}</strong> alocado na frente <strong>{getFrenteNome(m.frenteId)}</strong> deveria ter sido devolvido em {safeFormatDate(m.data_previa_saida, 'dd/MM/yyyy')}.
               </div>
             </div>
           ))}
@@ -155,7 +161,7 @@ export default function MateriaisAlugados() {
             <div key={`prox-${m.id}`} style={{ backgroundColor: 'var(--warning)20', borderLeft: '4px solid var(--warning)', padding: '1rem', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '1rem' }}>
               <CalendarClock color="#b37700" />
               <div>
-                <strong style={{ color: '#b37700' }}>Devolução Próxima:</strong> O material <strong>{m.descricao}</strong> alocado na frente <strong>{getFrenteNome(m.frenteId)}</strong> tem devolução prevista para {format(new Date(m.data_previa_saida), 'dd/MM/yyyy')}.
+                <strong style={{ color: '#b37700' }}>Devolução Próxima:</strong> O material <strong>{m.descricao}</strong> alocado na frente <strong>{getFrenteNome(m.frenteId)}</strong> tem devolução prevista para {safeFormatDate(m.data_previa_saida, 'dd/MM/yyyy')}.
               </div>
             </div>
           ))}

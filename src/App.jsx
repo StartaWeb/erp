@@ -11,6 +11,7 @@ import Relatorios from './pages/Relatorios';
 import Fornecedores from './pages/Fornecedores';
 import MateriaisAlugados from './pages/MateriaisAlugados';
 import MainLayout from './components/MainLayout';
+import ErrorBoundary from './components/ErrorBoundary';
 
 function PrivateRoute({ children }) {
   const { currentUser } = useAuth();
@@ -46,11 +47,13 @@ function AppRoutes() {
 
 function App() {
   return (
-    <AuthProvider>
-      <HashRouter>
-        <AppRoutes />
-      </HashRouter>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <HashRouter>
+          <AppRoutes />
+        </HashRouter>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
 
