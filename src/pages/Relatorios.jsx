@@ -1,33 +1,41 @@
-import { useState, useEffect } from 'react';
-import { getHistoricoMovimentacoes, getMateriais, getFornecedores, getFrentes } from '../services/db';
-import { FileText, Download, FileSpreadsheet, Search, Package } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { getHistoricoMovimentacoes, getMateriais, getFornecedores, getFrentes, getMateriaisAlugados } from '../services/db';
+import { FileText, Download, FileSpreadsheet, Search, Package, Users, Wrench, CalendarClock, Building2, ClipboardList } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 
+function safeFormatDate(dateVal, formatStr, options) {
+  if (!dateVal) return '-';
+  const d = typeof dateVal.toDate === 'function' ? dateVal.toDate() : new Date(dateVal);
+  return isNaN(d.getTime()) ? '-' : format(d, formatStr, options);
+}
+
 export default function Relatorios() {
   const [historico, setHistorico] = useState([]);
   const [materiais, setMateriais] = useState({});
   const [fornecedores, setFornecedores] = useState({});
   const [frentes, setFrentes] = useState({});
+  const [alugados, setAlugados] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('INVENTARIO'); // INVENTARIO ou AUDITORIA
   
-  // Filtros de Auditoria
+  const [activeTab, setActiveTab] = useState('INVENTARIO');
   const [materialFiltroId, setMaterialFiltroId] = useState('');
+  const [requisicaoFiltro, setRequisicaoFiltro] = useState('');
 
   useEffect(() => {
     let isMounted = true;
     async function loadData() {
       try {
         setLoading(true);
-        const [histData, matsData, fornsData, frentsData] = await Promise.all([
+        const [histData, matsData, fornsData, frentsData, alugData] = await Promise.all([
           getHistoricoMovimentacoes(),
           getMateriais(),
           getFornecedores(),
-          getFrentes()
+          getFrentes(),
+          getMateriaisAlugados()
         ]);
         
         if (isMounted) {
@@ -44,6 +52,7 @@ export default function Relatorios() {
           setFornecedores(fornsMap);
           setFrentes(frentsMap);
           setHistorico(histData);
+          setAlugados(alugData);
         }
       } catch (error) {
         console.error("Erro ao carregar relatórios", error);
@@ -55,309 +64,269 @@ export default function Relatorios() {
     return () => { isMounted = false; };
   }, []);
 
-  const dadosFiltrados = materialFiltroId 
+  const arrayMateriais = Object.values(materiais);
+  const arrayFornecedores = Object.values(fornecedores);
+  const arrayFrentes = Object.values(frentes);
+
+  const dadosAuditoria = materialFiltroId 
     ? historico.filter(h => h.materialId === materialFiltroId)
     : historico;
 
-  const arrayMateriais = Object.values(materiais);
+  const dadosRequisicao = requisicaoFiltro
+    ? historico.filter(h => h.requisicao?.toLowerCase().includes(requisicaoFiltro.toLowerCase()))
+    : historico.filter(h => h.requisicao); // Só mostra os que tem requisição
 
-  // EXPORTAÇÃO AUDITORIA (MOVIMENTAÇÕES)
-  function exportAuditoriaPDF() {
+  // --- Exportações Gerais ---
+  function exportarTabela(titulo, colunas, linhas, nomeArquivo) {
     const doc = new jsPDF();
     doc.setFontSize(16);
-    doc.text(materialFiltroId ? 'Auditoria de Material' : 'Relatório de Movimentações Gerais', 14, 15);
+    doc.text(titulo, 14, 15);
     doc.setFontSize(10);
     doc.text("Gerado em: " + format(new Date(), "dd/MM/yyyy HH:mm"), 14, 22);
-
-    const tableColumn = ["Data", "Tipo", "Material", "Qtd", "Responsável"];
-    const tableRows = [];
-
-    dadosFiltrados.forEach(h => {
-      const mat = materiais[h.materialId];
-      const dataStr = (h.dataRegistro && typeof h.dataRegistro.toDate === 'function') ? format(h.dataRegistro.toDate(), 'dd/MM/yyyy HH:mm') : '-';
-      const tipoStr = h.tipo;
-      const matStr = mat ? ((mat.codigo_descricao ? mat.codigo_descricao+' - ' : '') + mat.descricao) : 'Desconhecido';
-      
-      let respStr = h.operadorNome;
-      if (h.tipo === 'SAIDA') respStr = h.responsavelId + " (Req:" + (h.requisicao || '-') + ")";
-      if (h.tipo === 'DEVOLUCAO') respStr = h.responsavelId + " (Devolução)";
-      
-      tableRows.push([dataStr, tipoStr, matStr, h.quantidade, respStr]);
-    });
 
     doc.autoTable({
-      head: [tableColumn], body: tableRows, startY: 28, theme: 'grid', styles: { fontSize: 8 }, headStyles: { fillColor: [0, 82, 204] }
+      head: [colunas], body: linhas, startY: 28, theme: 'grid', styles: { fontSize: 8 }, headStyles: { fillColor: [0, 82, 204] }
     });
-    doc.save('relatorio_auditoria.pdf');
+    doc.save(nomeArquivo + '.pdf');
   }
 
-  function exportAuditoriaExcel() {
-    const dataToExport = dadosFiltrados.map(h => {
-      const mat = materiais[h.materialId];
-      const forn = fornecedores[h.fornecedorId];
-      const frente = frentes[h.frenteTrabalhoId];
-
-      return {
-        'Data Hora': (h.dataRegistro && typeof h.dataRegistro.toDate === 'function') ? format(h.dataRegistro.toDate(), 'dd/MM/yyyy HH:mm') : '-',
-        'Tipo Movimento': h.tipo,
-        'Cód. Material': mat?.codigo_descricao || '',
-        'Descrição Material': mat?.descricao || 'Desconhecido',
-        'Quantidade': h.quantidade,
-        'Preço Unitário': h.preco_unitario,
-        'Preço Total': h.preco_total,
-        'Operador Sistema': h.operadorNome,
-        'Fornecedor (Entrada)': forn ? forn.razao_social : (h.fornecedorId || '-'),
-        'NF (Entrada)': h.nf || '-',
-        'Destino/Origem (Frente)': frente ? frente.nome : (h.frenteTrabalhoId || '-'),
-        'Responsável (Saída/Dev)': h.responsavelId || '-',
-        'Requisição (Saída)': h.requisicao || '-',
-        'Equipamento/Placa (Saída)': h.equipamento ? (h.equipamento + " - " + h.placa_serie) : '-',
-        'Observações': h.observacoes || '-'
-      };
-    });
-
+  function exportarExcel(dataToExport, nomeAba, nomeArquivo) {
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Auditoria");
-    XLSX.writeFile(workbook, "auditoria_materiais.xlsx");
+    XLSX.utils.book_append_sheet(workbook, worksheet, nomeAba);
+    XLSX.writeFile(workbook, nomeArquivo + ".xlsx");
   }
 
-  // EXPORTAÇÃO INVENTÁRIO (MATERIAIS CADASTRADOS)
+  // --- Funções de Exportação por Aba ---
+
+  // INVENTÁRIO
   function exportInventarioPDF() {
-    const doc = new jsPDF();
-    doc.setFontSize(16);
-    doc.text('Relatório de Inventário (Materiais Cadastrados)', 14, 15);
-    doc.setFontSize(10);
-    doc.text("Gerado em: " + format(new Date(), "dd/MM/yyyy HH:mm"), 14, 22);
-
-    const tableColumn = ["Cód.", "Descrição", "Estoque", "Preço Médio", "Valor Total"];
-    const tableRows = [];
-    
+    const linhas = [];
     let somaGeral = 0;
-
     arrayMateriais.forEach(m => {
       const valorTotal = Number(m.estoque_atual || 0) * Number(m.preco_unitario_medio || 0);
       somaGeral += valorTotal;
-      tableRows.push([
-        m.codigo_descricao || '-',
-        m.descricao,
-        m.estoque_atual + ' ' + m.unidade,
-        "R$ " + Number(m.preco_unitario_medio || 0).toFixed(2),
-        "R$ " + valorTotal.toFixed(2)
-      ]);
+      linhas.push([m.codigo_descricao || '-', m.descricao, m.estoque_atual + ' ' + m.unidade, "R$ " + Number(m.preco_unitario_medio || 0).toFixed(2), "R$ " + valorTotal.toFixed(2)]);
     });
-
-    // Adiciona linha de total
-    tableRows.push(["", "TOTAL GERAL NO ESTOQUE:", "", "", "R$ " + somaGeral.toFixed(2)]);
-
-    doc.autoTable({
-      head: [tableColumn], body: tableRows, startY: 28, theme: 'grid', styles: { fontSize: 8 }, headStyles: { fillColor: [16, 124, 65] }
-    });
-    doc.save('relatorio_inventario.pdf');
+    linhas.push(["", "TOTAL GERAL NO ESTOQUE:", "", "", "R$ " + somaGeral.toFixed(2)]);
+    exportarTabela('Relatório de Inventário (Materiais)', ["Cód.", "Descrição", "Estoque", "Preço Médio", "Valor Total"], linhas, 'relatorio_inventario');
   }
-
   function exportInventarioExcel() {
-    const dataToExport = arrayMateriais.map(m => {
-      const valorTotal = Number(m.estoque_atual || 0) * Number(m.preco_unitario_medio || 0);
-      return {
-        'CÓDIGO': m.codigo_descricao || '',
-        'DESCRIÇÃO': m.descricao,
-        'TIPO': m.tipo,
-        'UNIDADE': m.unidade,
-        'ESTOQUE MÍNIMO': m.estoque_minimo,
-        'ESTOQUE ATUAL': m.estoque_atual,
-        'PREÇO MÉDIO (R$)': Number(m.preco_unitario_medio || 0).toFixed(2),
-        'VALOR TOTAL (R$)': valorTotal.toFixed(2)
-      };
-    });
-
-    const somaTotal = dataToExport.reduce((acc, curr) => acc + Number(curr['VALOR TOTAL (R$)']), 0);
-    
-    dataToExport.push({
-      'CÓDIGO': '', 'DESCRIÇÃO': 'TOTAL GERAL', 'TIPO': '', 'UNIDADE': '',
-      'ESTOQUE MÍNIMO': '', 'ESTOQUE ATUAL': '', 'PREÇO MÉDIO (R$)': '',
-      'VALOR TOTAL (R$)': somaTotal.toFixed(2)
-    });
-
-    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Inventario");
-    XLSX.writeFile(workbook, "Inventario_Geral.xlsx");
+    const data = arrayMateriais.map(m => ({
+      'CÓDIGO': m.codigo_descricao || '', 'DESCRIÇÃO': m.descricao, 'TIPO': m.tipo, 'ESTOQUE ATUAL': m.estoque_atual, 'VALOR TOTAL (R$)': (Number(m.estoque_atual || 0) * Number(m.preco_unitario_medio || 0)).toFixed(2)
+    }));
+    exportarExcel(data, "Inventario", "Inventario_Geral");
   }
+
+  // AUDITORIA (MOVIMENTAÇÕES)
+  function exportAuditoriaPDF() {
+    const colunas = ["Data", "Tipo", "Material", "Qtd", "Responsável"];
+    const linhas = dadosAuditoria.map(h => [
+      safeFormatDate(h.dataRegistro, 'dd/MM/yyyy HH:mm'), h.tipo, materiais[h.materialId]?.descricao || 'Desconhecido', h.quantidade, h.tipo === 'SAIDA' ? h.responsavelId + " (Req: " + (h.requisicao||'-') + ")" : h.tipo === 'ENTRADA' ? h.operadorNome : h.responsavelId
+    ]);
+    exportarTabela('Relatório de Movimentações', colunas, linhas, 'relatorio_auditoria');
+  }
+  function exportAuditoriaExcel() {
+    const data = dadosAuditoria.map(h => ({
+      'Data Hora': safeFormatDate(h.dataRegistro, 'dd/MM/yyyy HH:mm'), 'Tipo Movimento': h.tipo, 'Material': materiais[h.materialId]?.descricao || 'Desconhecido', 'Quantidade': h.quantidade, 'Responsável': h.responsavelId || h.operadorNome, 'Requisição': h.requisicao || '-'
+    }));
+    exportarExcel(data, "Auditoria", "auditoria_movimentacoes");
+  }
+
+  // REQUISIÇÕES
+  function exportRequisicaoPDF() {
+    const colunas = ["Requisição", "Data", "Material", "Qtd", "Responsável", "Frente"];
+    const linhas = dadosRequisicao.map(h => [
+      h.requisicao, safeFormatDate(h.dataRegistro, 'dd/MM/yyyy HH:mm'), materiais[h.materialId]?.descricao || 'Desconhecido', h.quantidade, h.responsavelId, frentes[h.frenteTrabalhoId]?.nome || h.frenteTrabalhoId
+    ]);
+    exportarTabela('Relatório de Requisições', colunas, linhas, 'relatorio_requisicoes');
+  }
+  function exportRequisicaoExcel() {
+    const data = dadosRequisicao.map(h => ({
+      'Requisição': h.requisicao, 'Data': safeFormatDate(h.dataRegistro, 'dd/MM/yyyy HH:mm'), 'Material': materiais[h.materialId]?.descricao || 'Desconhecido', 'Qtd': h.quantidade, 'Responsável': h.responsavelId, 'Frente': frentes[h.frenteTrabalhoId]?.nome || h.frenteTrabalhoId
+    }));
+    exportarExcel(data, "Requisicoes", "relatorio_requisicoes");
+  }
+
+  // FORNECEDORES
+  function exportFornecedoresPDF() {
+    const colunas = ["Razão Social", "CNPJ", "Telefone", "Email"];
+    const linhas = arrayFornecedores.map(f => [f.razao_social, f.cnpj || '-', f.telefone || '-', f.email || '-']);
+    exportarTabela('Relatório de Fornecedores', colunas, linhas, 'relatorio_fornecedores');
+  }
+  function exportFornecedoresExcel() {
+    exportarExcel(arrayFornecedores, "Fornecedores", "relatorio_fornecedores");
+  }
+
+  // FRENTES DE TRABALHO
+  function exportFrentesPDF() {
+    const colunas = ["Nome da Frente", "Endereço", "Responsável", "Status"];
+    const linhas = arrayFrentes.map(f => [f.nome, f.endereco || '-', f.responsavel || '-', f.status]);
+    exportarTabela('Relatório de Frentes de Trabalho', colunas, linhas, 'relatorio_frentes');
+  }
+  function exportFrentesExcel() {
+    exportarExcel(arrayFrentes, "Frentes", "relatorio_frentes");
+  }
+
+  // MATERIAIS ALUGADOS
+  function exportAlugadosPDF() {
+    const colunas = ["Material", "Frente", "Status", "Previsão Devolução"];
+    const linhas = alugados.map(a => [a.descricao, frentes[a.frenteId]?.nome || '-', a.status, safeFormatDate(a.data_previa_saida, 'dd/MM/yyyy')]);
+    exportarTabela('Relatório de Materiais Alugados', colunas, linhas, 'relatorio_alugados');
+  }
+  function exportAlugadosExcel() {
+    const data = alugados.map(a => ({
+      'Material': a.descricao, 'Frente': frentes[a.frenteId]?.nome || '-', 'Status': a.status, 'Previsão': safeFormatDate(a.data_previa_saida, 'dd/MM/yyyy')
+    }));
+    exportarExcel(data, "Alugados", "relatorio_alugados");
+  }
+
+  // --- Renderização ---
+  const abas = [
+    { id: 'INVENTARIO', label: 'Materiais (Inventário)', icon: Package },
+    { id: 'AUDITORIA', label: 'Movimentações', icon: FileText },
+    { id: 'REQUISICAO', label: 'Requisições', icon: ClipboardList },
+    { id: 'ALUGADOS', label: 'Materiais Alugados', icon: CalendarClock },
+    { id: 'FORNECEDORES', label: 'Fornecedores', icon: Building2 },
+    { id: 'FRENTES', label: 'Frentes de Trabalho', icon: Wrench },
+  ];
 
   return (
-    <div className="animate-fade-in">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
-        <div>
-          <h1 style={{ fontSize: '1.5rem', color: 'var(--text-main)', marginBottom: '0.25rem' }}>Relatórios do Sistema</h1>
-          <p style={{ color: 'var(--text-muted)' }}>Consulte ou imprima Inventários e Auditorias</p>
+    <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      <div>
+        <h1 style={{ fontSize: '1.5rem', color: 'var(--text-main)', marginBottom: '0.25rem' }}>Relatórios do Sistema</h1>
+        <p style={{ color: 'var(--text-muted)' }}>Exporte informações de diversas áreas do sistema</p>
+      </div>
+
+      <div style={{ display: 'flex', gap: '1rem', flexDirection: 'column', md: { flexDirection: 'row'} }}>
+        
+        {/* SIDEBAR DE ABAS */}
+        <div className="card" style={{ padding: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.25rem', minWidth: '280px' }}>
+          {abas.map(aba => (
+            <button 
+              key={aba.id}
+              onClick={() => setActiveTab(aba.id)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem 1rem', borderRadius: '4px',
+                border: 'none', cursor: 'pointer', textAlign: 'left',
+                backgroundColor: activeTab === aba.id ? 'var(--primary-light)' : 'transparent',
+                color: activeTab === aba.id ? 'var(--primary)' : 'var(--text-muted)',
+                fontWeight: activeTab === aba.id ? '500' : '400',
+                transition: 'all 0.2s'
+              }}
+            >
+              <aba.icon size={18} /> {aba.label}
+            </button>
+          ))}
         </div>
-      </div>
 
-      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', flexWrap: 'wrap', borderBottom: '2px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-        <button 
-          className={`btn ${activeTab === 'INVENTARIO' ? 'btn-primary' : 'btn-outline'}`}
-          onClick={() => setActiveTab('INVENTARIO')}
-          style={{ border: 'none', borderRadius: '4px 4px 0 0', padding: '0.75rem 1.5rem' }}
-        >
-          <Package size={18} /> Inventário (Materiais Cadastrados)
-        </button>
-        <button 
-          className={`btn ${activeTab === 'AUDITORIA' ? 'btn-primary' : 'btn-outline'}`}
-          onClick={() => setActiveTab('AUDITORIA')}
-          style={{ border: 'none', borderRadius: '4px 4px 0 0', padding: '0.75rem 1.5rem' }}
-        >
-          <FileText size={18} /> Auditoria (Histórico Movimentações)
-        </button>
-      </div>
-
-      {/* ABA DE INVENTÁRIO */}
-      {activeTab === 'INVENTARIO' && (
-        <>
-          <div className="card" style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <p style={{ color: 'var(--text-muted)' }}>Lista de todos os materiais atualmente cadastrados no estoque.</p>
+        {/* CONTEÚDO DO RELATÓRIO */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+            <h2 style={{ fontSize: '1.2rem', color: 'var(--text-main)' }}>{abas.find(a => a.id === activeTab)?.label}</h2>
+            
             <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button className="btn btn-outline" onClick={exportInventarioExcel} style={{ color: '#107c41', borderColor: '#107c41' }}>
+              <button className="btn btn-outline" style={{ color: '#107c41', borderColor: '#107c41' }} onClick={() => {
+                if(activeTab==='INVENTARIO') exportInventarioExcel();
+                if(activeTab==='AUDITORIA') exportAuditoriaExcel();
+                if(activeTab==='REQUISICAO') exportRequisicaoExcel();
+                if(activeTab==='ALUGADOS') exportAlugadosExcel();
+                if(activeTab==='FORNECEDORES') exportFornecedoresExcel();
+                if(activeTab==='FRENTES') exportFrentesExcel();
+              }}>
                 <FileSpreadsheet size={18} /> Exportar Excel
               </button>
-              <button className="btn btn-primary" onClick={exportInventarioPDF}>
+              <button className="btn btn-primary" onClick={() => {
+                if(activeTab==='INVENTARIO') exportInventarioPDF();
+                if(activeTab==='AUDITORIA') exportAuditoriaPDF();
+                if(activeTab==='REQUISICAO') exportRequisicaoPDF();
+                if(activeTab==='ALUGADOS') exportAlugadosPDF();
+                if(activeTab==='FORNECEDORES') exportFornecedoresPDF();
+                if(activeTab==='FRENTES') exportFrentesPDF();
+              }}>
                 <Download size={18} /> Exportar PDF
               </button>
             </div>
           </div>
 
+          {/* Filtros específicos por aba */}
+          {activeTab === 'AUDITORIA' && (
+            <div className="card" style={{ padding: '1rem' }}>
+              <label className="form-label">Filtrar por Material</label>
+              <select className="form-input" value={materialFiltroId} onChange={e => setMaterialFiltroId(e.target.value)}>
+                <option value="">Todas as Movimentações</option>
+                {arrayMateriais.map(m => <option key={m.id} value={m.id}>{m.descricao}</option>)}
+              </select>
+            </div>
+          )}
+
+          {activeTab === 'REQUISICAO' && (
+            <div className="card" style={{ padding: '1rem' }}>
+              <label className="form-label">Buscar Requisição</label>
+              <div style={{ position: 'relative' }}>
+                <Search size={18} style={{ position: 'absolute', top: '50%', left: '1rem', transform: 'translateY(-50%)', color: 'var(--text-muted)' }}/>
+                <input type="text" className="form-input" style={{ paddingLeft: '2.5rem' }} placeholder="Digite o número da requisição..." value={requisicaoFiltro} onChange={e => setRequisicaoFiltro(e.target.value)} />
+              </div>
+            </div>
+          )}
+
+          {/* Tabela de Previsualização */}
           <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
             {loading ? (
               <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>Carregando...</div>
-            ) : arrayMateriais.length === 0 ? (
-              <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>Nenhum material cadastrado.</div>
             ) : (
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid var(--border-color)', backgroundColor: 'var(--bg-app)' }}>
-                    <th style={{ padding: '1rem', fontWeight: '500' }}>Material</th>
-                    <th style={{ padding: '1rem', fontWeight: '500' }}>Estoque Atual</th>
-                    <th style={{ padding: '1rem', fontWeight: '500' }}>Preço Médio</th>
-                    <th style={{ padding: '1rem', fontWeight: '500' }}>Valor Total</th>
+                    {activeTab === 'INVENTARIO' && <><th style={{padding:'1rem'}}>Descrição</th><th style={{padding:'1rem'}}>Estoque</th></>}
+                    {activeTab === 'AUDITORIA' && <><th style={{padding:'1rem'}}>Data</th><th style={{padding:'1rem'}}>Tipo</th><th style={{padding:'1rem'}}>Material</th><th style={{padding:'1rem'}}>Qtd</th></>}
+                    {activeTab === 'REQUISICAO' && <><th style={{padding:'1rem'}}>Requisição</th><th style={{padding:'1rem'}}>Material</th><th style={{padding:'1rem'}}>Qtd</th></>}
+                    {activeTab === 'ALUGADOS' && <><th style={{padding:'1rem'}}>Material</th><th style={{padding:'1rem'}}>Frente</th><th style={{padding:'1rem'}}>Status</th></>}
+                    {activeTab === 'FORNECEDORES' && <><th style={{padding:'1rem'}}>Razão Social</th><th style={{padding:'1rem'}}>CNPJ</th></>}
+                    {activeTab === 'FRENTES' && <><th style={{padding:'1rem'}}>Nome da Frente</th><th style={{padding:'1rem'}}>Status</th></>}
                   </tr>
                 </thead>
                 <tbody>
-                  {arrayMateriais.map(m => {
-                    const valorTotal = Number(m.estoque_atual || 0) * Number(m.preco_unitario_medio || 0);
-                    return (
-                      <tr key={m.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                        <td style={{ padding: '1rem' }}>
-                          <div style={{ fontWeight: '500' }}>{m.descricao}</div>
-                          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Cód: {m.codigo_descricao || '-'}</div>
-                        </td>
-                        <td style={{ padding: '1rem', fontWeight: '600' }}>{m.estoque_atual} {m.unidade}</td>
-                        <td style={{ padding: '1rem' }}>R$ {Number(m.preco_unitario_medio || 0).toFixed(2)}</td>
-                        <td style={{ padding: '1rem', fontWeight: '500' }}>R$ {valorTotal.toFixed(2)}</td>
-                      </tr>
-                    )
-                  })}
+                  {activeTab === 'INVENTARIO' && arrayMateriais.slice(0, 50).map(m => (
+                    <tr key={m.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                      <td style={{padding:'1rem'}}>{m.descricao}</td><td style={{padding:'1rem'}}>{m.estoque_atual}</td>
+                    </tr>
+                  ))}
+                  {activeTab === 'AUDITORIA' && dadosAuditoria.slice(0, 50).map(h => (
+                    <tr key={h.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                      <td style={{padding:'1rem'}}>{safeFormatDate(h.dataRegistro, 'dd/MM/yyyy HH:mm')}</td><td style={{padding:'1rem'}}>{h.tipo}</td><td style={{padding:'1rem'}}>{materiais[h.materialId]?.descricao}</td><td style={{padding:'1rem'}}>{h.quantidade}</td>
+                    </tr>
+                  ))}
+                  {activeTab === 'REQUISICAO' && dadosRequisicao.slice(0, 50).map(h => (
+                    <tr key={h.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                      <td style={{padding:'1rem'}}>{h.requisicao}</td><td style={{padding:'1rem'}}>{materiais[h.materialId]?.descricao}</td><td style={{padding:'1rem'}}>{h.quantidade}</td>
+                    </tr>
+                  ))}
+                  {activeTab === 'ALUGADOS' && alugados.slice(0, 50).map(a => (
+                    <tr key={a.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                      <td style={{padding:'1rem'}}>{a.descricao}</td><td style={{padding:'1rem'}}>{frentes[a.frenteId]?.nome}</td><td style={{padding:'1rem'}}>{a.status}</td>
+                    </tr>
+                  ))}
+                  {activeTab === 'FORNECEDORES' && arrayFornecedores.slice(0, 50).map(f => (
+                    <tr key={f.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                      <td style={{padding:'1rem'}}>{f.razao_social}</td><td style={{padding:'1rem'}}>{f.cnpj || '-'}</td>
+                    </tr>
+                  ))}
+                  {activeTab === 'FRENTES' && arrayFrentes.slice(0, 50).map(f => (
+                    <tr key={f.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                      <td style={{padding:'1rem'}}>{f.nome}</td><td style={{padding:'1rem'}}>{f.status}</td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             )}
-          </div>
-        </>
-      )}
-
-      {/* ABA DE AUDITORIA */}
-      {activeTab === 'AUDITORIA' && (
-        <>
-          <div className="card" style={{ marginBottom: '1.5rem' }}>
-            <h3 style={{ marginBottom: '1rem', fontSize: '1.1rem' }}>Filtro de Auditoria</h3>
-            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
-              <div style={{ flex: 1, minWidth: '250px' }}>
-                <select className="form-input" value={materialFiltroId} onChange={e => setMaterialFiltroId(e.target.value)}>
-                  <option value="">Todas as Movimentações (Histórico Geral)</option>
-                  {arrayMateriais.map(m => (
-                    <option key={m.id} value={m.id}>{m.codigo_descricao ? `[${m.codigo_descricao}] ` : ''}{m.descricao}</option>
-                  ))}
-                </select>
-              </div>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button className="btn btn-outline" onClick={exportAuditoriaExcel}>
-                  <FileSpreadsheet size={18} /> Exportar Excel
-                </button>
-                <button className="btn btn-primary" onClick={exportAuditoriaPDF}>
-                  <Download size={18} /> Exportar PDF
-                </button>
-              </div>
+            <div style={{ padding: '1rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+              Mostrando prévia. Exporte para ver todos os registros e colunas completas.
             </div>
           </div>
+        </div>
 
-          <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
-            {loading ? (
-              <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-                Carregando histórico...
-              </div>
-            ) : dadosFiltrados.length === 0 ? (
-              <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-                <Search size={48} style={{ margin: '0 auto 1rem', opacity: 0.5 }} />
-                <p>Nenhuma movimentação registrada para os filtros selecionados.</p>
-              </div>
-            ) : (
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
-                <thead>
-                  <tr style={{ borderBottom: '1px solid var(--border-color)', backgroundColor: 'var(--bg-app)' }}>
-                    <th style={{ padding: '1rem', fontWeight: '500', color: 'var(--text-muted)' }}>Data/Hora</th>
-                    <th style={{ padding: '1rem', fontWeight: '500', color: 'var(--text-muted)' }}>Tipo</th>
-                    <th style={{ padding: '1rem', fontWeight: '500', color: 'var(--text-muted)' }}>Material</th>
-                    <th style={{ padding: '1rem', fontWeight: '500', color: 'var(--text-muted)' }}>Qtd</th>
-                    <th style={{ padding: '1rem', fontWeight: '500', color: 'var(--text-muted)' }}>Responsável / Detalhes</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {dadosFiltrados.map(h => {
-                    const mat = materiais[h.materialId];
-                    return (
-                      <tr key={h.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                        <td style={{ padding: '1rem' }}>
-                          {(h.dataRegistro && typeof h.dataRegistro.toDate === 'function') ? format(h.dataRegistro.toDate(), "dd/MMM yy HH:mm", { locale: ptBR }) : '-'}
-                        </td>
-                        <td style={{ padding: '1rem' }}>
-                          <span style={{ 
-                            padding: '0.25rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 'bold',
-                            backgroundColor: h.tipo === 'ENTRADA' ? 'var(--success)20' : (h.tipo === 'DEVOLUCAO' ? 'var(--info)20' : 'var(--warning)20'),
-                            color: h.tipo === 'ENTRADA' ? 'var(--success)' : (h.tipo === 'DEVOLUCAO' ? 'var(--info)' : 'var(--warning)')
-                          }}>
-                            {h.tipo}
-                          </span>
-                        </td>
-                        <td style={{ padding: '1rem' }}>
-                          <div style={{ fontWeight: '500' }}>{mat?.descricao || 'Desconhecido'}</div>
-                          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Cód: {mat?.codigo_descricao || '-'}</div>
-                        </td>
-                        <td style={{ padding: '1rem', fontWeight: '600' }}>{h.quantidade}</td>
-                        <td style={{ padding: '1rem' }}>
-                          {h.tipo === 'ENTRADA' ? (
-                            <div style={{ fontSize: '0.85rem' }}>
-                              <span style={{ color: 'var(--text-muted)' }}>NF:</span> {h.nf || '-'} <br/>
-                              <span style={{ color: 'var(--text-muted)' }}>Operador:</span> {h.operadorNome}
-                            </div>
-                          ) : h.tipo === 'DEVOLUCAO' ? (
-                            <div style={{ fontSize: '0.85rem' }}>
-                              <span style={{ color: 'var(--text-muted)' }}>Devolvido por:</span> {h.responsavelId} <br/>
-                              <span style={{ color: 'var(--text-muted)' }}>Frente:</span> {frentes[h.frenteTrabalhoId]?.nome || h.frenteTrabalhoId}
-                            </div>
-                          ) : (
-                            <div style={{ fontSize: '0.85rem' }}>
-                              <span style={{ color: 'var(--text-muted)' }}>Encarregado:</span> {h.responsavelId} <br/>
-                              <span style={{ color: 'var(--text-muted)' }}>Frente:</span> {frentes[h.frenteTrabalhoId]?.nome || h.frenteTrabalhoId}
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </>
-      )}
+      </div>
     </div>
   );
 }

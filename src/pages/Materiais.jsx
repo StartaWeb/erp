@@ -160,7 +160,7 @@ export default function Materiais() {
         </div>
       </div>
 
-      <div className="card" style={{ marginBottom: '1.5rem' }}>
+      <div className="card" style={{ marginBottom: '1.5rem', position: 'sticky', top: '75px', zIndex: 20, boxShadow: 'var(--shadow-md)' }}>
         <div style={{ position: 'relative', maxWidth: '400px' }}>
           <div style={{ position: 'absolute', top: '50%', left: '1rem', transform: 'translateY(-50%)', color: 'var(--text-muted)' }}>
             <Search size={18} />
@@ -191,14 +191,14 @@ export default function Materiais() {
             <table className="excel-table">
               <thead>
                 <tr>
-                  <th><div className="resizer">Cód.</div></th>
-                  <th><div className="resizer">Descrição</div></th>
-                  <th><div className="resizer">Tipo</div></th>
-                  <th><div className="resizer">Fornecedor Padrão</div></th>
-                  <th style={{ textAlign: 'right' }}><div className="resizer" style={{ justifyContent: 'flex-end' }}>Estoque</div></th>
-                  <th style={{ textAlign: 'right' }}><div className="resizer" style={{ justifyContent: 'flex-end' }}>Preço Médio</div></th>
-                  <th style={{ textAlign: 'right' }}><div className="resizer" style={{ justifyContent: 'flex-end' }}>Valor Total</div></th>
-                  <th style={{ textAlign: 'center' }}><div className="resizer" style={{ justifyContent: 'center' }}>Ações</div></th>
+                  <th style={{ minWidth: '100px' }}><div className="resizer">Cód.</div></th>
+                  <th style={{ minWidth: '250px' }}><div className="resizer">Descrição</div></th>
+                  <th style={{ minWidth: '120px' }}><div className="resizer">Tipo</div></th>
+                  <th style={{ minWidth: '150px' }}><div className="resizer">Fornecedor Padrão</div></th>
+                  <th style={{ textAlign: 'right', minWidth: '120px' }}><div className="resizer" style={{ justifyContent: 'flex-end' }}>Estoque</div></th>
+                  <th style={{ textAlign: 'right', minWidth: '140px' }}><div className="resizer" style={{ justifyContent: 'flex-end' }}>Preço Médio</div></th>
+                  <th style={{ textAlign: 'right', minWidth: '140px' }}><div className="resizer" style={{ justifyContent: 'flex-end' }}>Valor Total</div></th>
+                  <th style={{ textAlign: 'center', minWidth: '80px' }}><div className="resizer" style={{ justifyContent: 'center' }}>Ações</div></th>
                 </tr>
               </thead>
               <tbody>

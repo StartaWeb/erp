@@ -18,6 +18,16 @@ export default function Movimentacoes() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
 
+  // Helper para gerar número de requisição único
+  const gerarRequisicao = () => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let result = '';
+    for (let i = 0; i < 4; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return `REQ-${format(new Date(), 'yyyyMMdd')}-${result}`;
+  };
+
   // Autocomplete state
   const [materialSearch, setMaterialSearch] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
@@ -105,7 +115,7 @@ export default function Movimentacoes() {
           coletor: formData.coletor,
           vala_mnd: formData.vala_mnd,
           responsavelId: formData.responsavelId,
-          requisicao: formData.requisicao,
+          requisicao: formData.requisicao || gerarRequisicao(),
           equipamento: formData.equipamento,
           placa_serie: formData.placa_serie,
           operadorId: currentUser.uid,
@@ -121,6 +131,7 @@ export default function Movimentacoes() {
         await registrarDevolucao({
           frenteTrabalhoId: formData.frenteTrabalhoId,
           responsavelId: formData.responsavelId,
+          requisicao: formData.requisicao, // Amarrar devolução à requisição
           observacoes: formData.observacoes,
           operadorId: currentUser.uid,
           operadorNome: userProfile?.nome || currentUser.email
@@ -144,6 +155,10 @@ export default function Movimentacoes() {
 
   const selectedMaterial = materiais.find(m => m.id === formData.materialId);
   const filteredMateriais = materiais.filter(m => {
+    if (activeTab === 'DEVOLUCAO' && formData.requisicao) {
+      const temNaRequisicao = historico.some(h => h.tipo === 'SAIDA' && h.requisicao === formData.requisicao && h.materialId === m.id);
+      if (!temNaRequisicao) return false;
+    }
     const search = materialSearch.toLowerCase();
     return (m.descricao || '').toLowerCase().includes(search) || (m.codigo_descricao || '').toLowerCase().includes(search);
   });
@@ -227,7 +242,11 @@ export default function Movimentacoes() {
         </button>
         <button 
           type="button"
-          onClick={() => { setActiveTab('SAIDA'); setMessage(null); }}
+          onClick={() => { 
+            setActiveTab('SAIDA'); 
+            setMessage(null); 
+            setFormData(prev => ({...prev, requisicao: gerarRequisicao()})); 
+          }}
           style={{ 
             flex: 1, minWidth: '150px', padding: '1rem', borderRadius: 'var(--radius-md)', border: 'none', cursor: 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
@@ -241,7 +260,11 @@ export default function Movimentacoes() {
         </button>
         <button 
           type="button"
-          onClick={() => { setActiveTab('DEVOLUCAO'); setMessage(null); }}
+          onClick={() => { 
+            setActiveTab('DEVOLUCAO'); 
+            setMessage(null); 
+            setFormData(prev => ({...prev, requisicao: ''})); 
+          }}
           style={{ 
             flex: 1, minWidth: '150px', padding: '1rem', borderRadius: 'var(--radius-md)', border: 'none', cursor: 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
@@ -315,6 +338,21 @@ export default function Movimentacoes() {
               )}
             </div>
 
+            {(activeTab === 'DEVOLUCAO') && (
+              <div className="form-group" style={{ gridColumn: '1 / -1', backgroundColor: 'var(--warning)10', padding: '1rem', borderRadius: '4px', border: '1px solid var(--warning)' }}>
+                <label className="form-label" style={{ color: '#b37700' }}>Vincular a uma Requisição de Origem (Opcional)</label>
+                <select name="requisicao" className="form-input" value={formData.requisicao} onChange={handleInputChange}>
+                  <option value="">-- Devolução Avulsa (Sem requisição) --</option>
+                  {[...new Set(historico.filter(h => h.tipo === 'SAIDA' && h.requisicao).map(h => h.requisicao))].map(req => (
+                    <option key={req} value={req}>{req}</option>
+                  ))}
+                </select>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+                  Ao selecionar a requisição, esta devolução abaterá os itens registrados nela.
+                </div>
+              </div>
+            )}
+
             <div className="form-group">
               <label className="form-label">Quantidade *</label>
               <div style={{ display: 'flex', alignItems: 'center' }}>
@@ -367,8 +405,8 @@ export default function Movimentacoes() {
             {activeTab === 'SAIDA' && (
               <>
                 <div className="form-group">
-                  <label className="form-label">Requisição Nº</label>
-                  <input type="text" name="requisicao" className="form-input" value={formData.requisicao} onChange={handleInputChange} />
+                  <label className="form-label">Requisição Nº *</label>
+                  <input required type="text" name="requisicao" className="form-input" value={formData.requisicao} onChange={handleInputChange} style={{ backgroundColor: 'var(--bg-app)', fontWeight: 'bold' }} />
                 </div>
                 <div className="form-group">
                   <label className="form-label">Coletor / Motorista</label>
