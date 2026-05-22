@@ -112,12 +112,15 @@ export default function MateriaisAlugados() {
   const hoje = new Date();
   
   // Alertas
-  const materiaisAtrasados = materiais.filter(m => 
-    m.status === 'EM USO' && m.data_previa_saida && isBefore(new Date(m.data_previa_saida), hoje)
-  );
+  const materiaisAtrasados = materiais.filter(m => {
+    if (m.status !== 'EM USO' || !m.data_previa_saida) return false;
+    const dataSaida = new Date(m.data_previa_saida);
+    return !isNaN(dataSaida.getTime()) && isBefore(dataSaida, hoje);
+  });
   const materiaisProximosVencimento = materiais.filter(m => {
     if (m.status !== 'EM USO' || !m.data_previa_saida) return false;
     const dataSaida = new Date(m.data_previa_saida);
+    if (isNaN(dataSaida.getTime())) return false;
     return isAfter(dataSaida, hoje) && isBefore(dataSaida, addDays(hoje, 3));
   });
 

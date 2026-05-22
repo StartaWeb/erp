@@ -59,11 +59,13 @@ export default function Dashboard() {
         emUso.forEach(a => {
           if (a.data_previa_saida) {
             const dataSaida = new Date(a.data_previa_saida);
-            if (isBefore(dataSaida, hoje)) {
-              atrasados++;
-              alertasLocacao.push({ ...a, tipoAlerta: 'ATRASADO' });
-            } else if (isAfter(dataSaida, hoje) && isBefore(dataSaida, addDays(hoje, 3))) {
-              alertasLocacao.push({ ...a, tipoAlerta: 'PROXIMO' });
+            if (!isNaN(dataSaida.getTime())) {
+              if (isBefore(dataSaida, hoje)) {
+                atrasados++;
+                alertasLocacao.push({ ...a, tipoAlerta: 'ATRASADO' });
+              } else if (isAfter(dataSaida, hoje) && isBefore(dataSaida, addDays(hoje, 3))) {
+                alertasLocacao.push({ ...a, tipoAlerta: 'PROXIMO' });
+              }
             }
           }
         });
